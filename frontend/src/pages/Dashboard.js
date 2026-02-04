@@ -4,6 +4,7 @@ import { AuthContext } from '../context/AuthContext';
 import TeamMembers from '../components/TeamMembers';
 import Categories from '../components/Categories';
 import Emails from '../components/Emails';
+import EmailSettings from '../components/EmailSettings';
 import Calendar from '../components/Calendar';
 import WelcomeTutorial from '../components/WelcomeTutorial';
 import '../styles/Dashboard.css';
@@ -138,6 +139,12 @@ function Dashboard() {
                 📧 Emails
               </button>
               <button 
+                className={`nav-item ${activeTab === 'email-settings' ? 'active' : ''}`}
+                onClick={() => setActiveTab('email-settings')}
+              >
+                ⚙️ Email Settings
+              </button>
+              <button 
                 className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
                 onClick={() => setActiveTab('calendar')}
               >
@@ -156,6 +163,9 @@ function Dashboard() {
           )}
           {activeTab === 'emails' && (
             <Emails key={refreshKey} onRefresh={handleRefresh} isAdmin={user.isAdmin} token={token} userId={user.id} />
+          )}
+          {activeTab === 'email-settings' && (
+            <EmailSettings key={refreshKey} />
           )}
           {activeTab === 'calendar' && (
             <Calendar key={refreshKey} token={token} userId={user.id} />

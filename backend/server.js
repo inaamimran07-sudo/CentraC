@@ -128,6 +128,20 @@ function initializeDatabase() {
       )
     `);
 
+    // Email settings table
+    db.run(`
+      CREATE TABLE IF NOT EXISTS email_settings (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        userId INTEGER UNIQUE NOT NULL,
+        provider TEXT NOT NULL,
+        email TEXT NOT NULL,
+        appPassword TEXT NOT NULL,
+        lastSync DATETIME,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(userId) REFERENCES users(id)
+      )
+    `);
+
     // Create default admin user
     const adminEmail = 'inaamimran07@gmail.com';
     const adminPassword = bcrypt.hashSync('Atg9341poL', 10);
@@ -745,6 +759,56 @@ app.get('/api/users', authenticateToken, (req, res) => {
 app.post('/api/users/tutorial-seen', authenticateToken, (req, res) => {
   db.run(
     'UPDATE users SET hasSeenTutorial = 1 WHERE id = ?',
+    [req.user.id],
+    (err) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+// Email Settings Routes
+app.get('/api/email-settings', authenticateToken, (req, res) => {
+  db.get(
+    'SELECT provider, email, lastSync FROM email_settings WHERE userId = ?',
+    [req.user.id],
+    (err, row) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res.json(row || null);
+    }
+  );
+});
+
+app.post('/api/email-settings', authenticateToken, (req, res) => {
+  const { provider, email, appPassword } = req.body;
+
+  if (!provider || !email || !appPassword) {
+    return res.status(400).json({ error: 'All fields required' });
+  }
+
+  // Simple encryption (in production, use proper encryption)
+  const encryptedPassword = Buffer.from(appPassword).toString('base64');
+
+  db.run(
+    `INSERT OR REPLACE INTO email_settings (userId, provider, email, appPassword) 
+     VALUES (?, ?, ?, ?)`,
+    [req.user.id, provider, email, encryptedPassword],
+    (err) => {
+      if (err) {
+        return res.status(500).json({ error: 'Database error' });
+      }
+      res.json({ success: true });
+    }
+  );
+});
+
+app.delete('/api/email-settings', authenticateToken, (req, res) => {
+  db.run(
+    'DELETE FROM email_settings WHERE userId = ?',
     [req.user.id],
     (err) => {
       if (err) {
