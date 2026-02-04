@@ -407,34 +407,35 @@ app.post('/api/categories', authenticateToken, async (req, res) => {
     return res.status(400).json({ error: 'Category name required' });
   }
 
-  db.run(
-    'INSERT INTO categories (name, createdBy) VALUES (?, ?)',
-    [name, req.user.id],
-    (err) => {
-      if (err) {
-        return res.status(400).json({ error: 'Error creating category' });
-      }
-      res.status(201).json({ id: this.lastID, name, createdBy: req.user.id });
-    }
-  );
+  try {
+    const result = await pool.query(
+      'INSERT INTO categories (name, createdBy) VALUES ($1, $2) RETURNING id',
+      [name, req.user.id]
+    );
+    res.status(201).json({ id: result.rows[0].id, name, createdBy: req.user.id });
+  } catch (err) {
+    console.error('Create category error:', err);
+    return res.status(400).json({ error: 'Error creating category' });
+  }
 });
 
 // Delete category (admin only)
-app.delete('/api/categories/:id', authenticateToken, (req, res) => {
+app.delete('/api/categories/:id', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  db.run('DELETE FROM categories WHERE id = ?', [req.params.id], (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+  try {
+    await pool.query('DELETE FROM categories WHERE id = $1', [req.params.id]);
     res.json({ success: true });
-  });
+  } catch (err) {
+    console.error('Delete category error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Get subcategories for a category
-app.get('/api/categories/:id/subcategories', authenticateToken, (req, res) => {
+app.get('/api/categories/:id/subcategories', authenticateToken, async (req, res) => {
   const { filterByUser } = req.query;
   const categoryId = req.params.id;
 
@@ -443,23 +444,21 @@ app.get('/api/categories/:id/subcategories', authenticateToken, (req, res) => {
     FROM subcategories s
     LEFT JOIN users u2 ON s.assignedToUserId = u2.id
     LEFT JOIN team_members tm2 ON u2.id = tm2.userId
-    WHERE s.categoryId = ?`;
+    WHERE s.categoryId = $1`;
   let params = [categoryId];
 
   if (filterByUser === 'true') {
-    query += ` AND s.createdBy = ?`;
+    query += ` AND s.createdBy = $2`;
     params.push(req.user.id);
   }
 
-  db.all(query, params, (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+  try {
+    const result = await pool.query(query, params);
 
     // Calculate priority based on due date
     const now = new Date();
-    const updatedRows = rows.map(row => {
-      const dueDate = new Date(row.dueDate);
+    const updatedRows = result.rows.map(row => {
+      const dueDate = new Date(row.duedate);
       const monthsDiff = (dueDate.getFullYear() - now.getFullYear()) * 12 + 
                          (dueDate.getMonth() - now.getMonth());
 
@@ -476,28 +475,28 @@ app.get('/api/categories/:id/subcategories', authenticateToken, (req, res) => {
     });
 
     res.json(updatedRows);
-  });
+  } catch (err) {
+    console.error('Get subcategories error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Create subcategory
-app.post('/api/subcategories', authenticateToken, (req, res) => {
+app.post('/api/subcategories', authenticateToken, async (req, res) => {
   const { categoryId, companyName, description, assignedToUserId, priority, progress, dueDate } = req.body;
 
   if (!categoryId || !companyName || !dueDate) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
 
-  db.run(
-    `INSERT INTO subcategories (categoryId, companyName, description, assignedToUserId, priority, progress, dueDate, createdBy) 
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-    [categoryId, companyName, description || '', assignedToUserId || null, priority || 'low', progress || 'not-started', dueDate, req.user.id],
-    function(err) {
-      if (err) {
-        console.error('Error creating subcategory:', err);
-        return res.status(400).json({ error: 'Error creating subcategory: ' + err.message });
-      }
-      res.status(201).json({ 
-        id: this.lastID, 
+  try {
+    const result = await pool.query(
+      `INSERT INTO subcategories (categoryId, companyName, description, assignedToUserId, priority, progress, dueDate, createdBy) 
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id`,
+      [categoryId, companyName, description || '', assignedToUserId || null, priority || 'low', progress || 'not-started', dueDate, req.user.id]
+    );
+    res.status(201).json({ 
+      id: result.rows[0].id, 
         categoryId, 
         companyName,
         description,
@@ -507,12 +506,14 @@ app.post('/api/subcategories', authenticateToken, (req, res) => {
         dueDate, 
         createdBy: req.user.id 
       });
-    }
-  );
+  } catch (err) {
+    console.error('Error creating subcategory:', err);
+    return res.status(400).json({ error: 'Error creating subcategory: ' + err.message });
+  }
 });
 
 // Update subcategory
-app.put('/api/subcategories/:id', authenticateToken, (req, res) => {
+app.put('/api/subcategories/:id', authenticateToken, async (req, res) => {
   const { priority, progress, description, assignedToUserId, companyName, dueDate } = req.body;
 
   if (!priority && !progress && description === undefined && assignedToUserId === undefined && !companyName && !dueDate) {
@@ -521,244 +522,227 @@ app.put('/api/subcategories/:id', authenticateToken, (req, res) => {
 
   let query = 'UPDATE subcategories SET ';
   const params = [];
+  let paramIndex = 1;
 
   if (priority) {
-    query += 'priority = ?, ';
+    query += `priority = $${paramIndex++}, `;
     params.push(priority);
   }
 
   if (progress) {
-    query += 'progress = ?, ';
+    query += `progress = $${paramIndex++}, `;
     params.push(progress);
   }
 
   if (description !== undefined) {
-    query += 'description = ?, ';
+    query += `description = $${paramIndex++}, `;
     params.push(description);
   }
 
   if (assignedToUserId !== undefined) {
-    query += 'assignedToUserId = ?, ';
+    query += `assignedToUserId = $${paramIndex++}, `;
     params.push(assignedToUserId || null);
   }
 
   if (companyName) {
-    query += 'companyName = ?, ';
+    query += `companyName = $${paramIndex++}, `;
     params.push(companyName);
   }
 
   if (dueDate) {
-    query += 'dueDate = ?, ';
+    query += `dueDate = $${paramIndex++}, `;
     params.push(dueDate);
   }
 
   query = query.slice(0, -2);
-  query += ' WHERE id = ?';
+  query += ` WHERE id = $${paramIndex}`;
   params.push(req.params.id);
 
-  db.run(query, params, (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+  try {
+    await pool.query(query, params);
     res.json({ success: true });
-  });
+  } catch (err) {
+    console.error('Update subcategory error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Delete subcategory (user can delete own, admin can delete any)
-app.delete('/api/subcategories/:id', authenticateToken, (req, res) => {
-  // First, get the subcategory to check if user is the creator
-  db.get('SELECT createdBy FROM subcategories WHERE id = ?', [req.params.id], (err, row) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+app.delete('/api/subcategories/:id', authenticateToken, async (req, res) => {
+  try {
+    // First, get the subcategory to check if user is the creator
+    const result = await pool.query('SELECT createdBy FROM subcategories WHERE id = $1', [req.params.id]);
     
-    if (!row) {
+    if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Subcategory not found' });
     }
 
+    const row = result.rows[0];
+    
     // Allow deletion if user is admin or if they created it
-    if (!req.user.isAdmin && row.createdBy !== req.user.id) {
+    if (!req.user.isAdmin && row.createdby !== req.user.id) {
       return res.status(403).json({ error: 'You can only delete your own subcategories' });
     }
 
-    db.run('DELETE FROM subcategories WHERE id = ?', [req.params.id], (err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json({ success: true });
-    });
-  });
+    await pool.query('DELETE FROM subcategories WHERE id = $1', [req.params.id]);
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete subcategory error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Get tasks for a date
-app.get('/api/tasks', authenticateToken, (req, res) => {
+app.get('/api/tasks', authenticateToken, async (req, res) => {
   const { date, filterByUser } = req.query;
 
   let query = 'SELECT * FROM tasks';
   const params = [];
+  let paramIndex = 1;
 
   if (date) {
-    query += ' WHERE date = ?';
+    query += ` WHERE date = $${paramIndex++}`;
     params.push(date);
   }
 
   if (filterByUser === 'true') {
     query += date ? ' AND' : ' WHERE';
-    query += ' createdBy = ?';
+    query += ` createdBy = $${paramIndex++}`;
     params.push(req.user.id);
   }
 
-  db.all(query, params, (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(rows);
-  });
+  try {
+    const result = await pool.query(query, params);
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get tasks error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Create task
-app.post('/api/tasks', authenticateToken, (req, res) => {
+app.post('/api/tasks', authenticateToken, async (req, res) => {
   const { title, date, subcategoryId } = req.body;
 
   if (!title || !date) {
     return res.status(400).json({ error: 'Title and date required' });
   }
 
-  db.run(
-    'INSERT INTO tasks (title, date, subcategoryId, createdBy) VALUES (?, ?, ?, ?)',
-    [title, date, subcategoryId || null, req.user.id],
-    function(err) {
-      if (err) {
-        return res.status(400).json({ error: 'Error creating task' });
-      }
-      res.status(201).json({ 
-        id: this.lastID, 
-        title, 
-        date, 
-        subcategoryId, 
-        createdBy: req.user.id 
-      });
-    }
-  );
+  try {
+    const result = await pool.query(
+      'INSERT INTO tasks (title, date, subcategoryId, createdBy) VALUES ($1, $2, $3, $4) RETURNING id',
+      [title, date, subcategoryId || null, req.user.id]
+    );
+    res.status(201).json({ 
+      id: result.rows[0].id, 
+      title, 
+      date, 
+      subcategoryId, 
+      createdBy: req.user.id 
+    });
+  } catch (err) {
+    console.error('Error creating task:', err);
+    return res.status(400).json({ error: 'Error creating task' });
+  }
 });
 
 // Get all users (for team member selection)
-app.get('/api/users', authenticateToken, (req, res) => {
+app.get('/api/users', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
   
-  db.all(
-    `SELECT id, name, email, isAdmin, approved FROM users WHERE isAdmin = 0 
-     AND id NOT IN (SELECT userId FROM team_members)`,
-    [],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(rows);
-    }
-  );
+  try {
+    const result = await pool.query(
+      `SELECT id, name, email, isAdmin, approved FROM users WHERE isAdmin = false 
+       AND id NOT IN (SELECT userId FROM team_members)`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get users error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Get pending users (admin only)
-app.get('/api/users/pending', authenticateToken, (req, res) => {
+app.get('/api/users/pending', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  db.all(
-    'SELECT id, name, email, createdAt FROM users WHERE approved = 0 AND isAdmin = 0',
-    [],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(rows);
-    }
-  );
+  try {
+    const result = await pool.query(
+      'SELECT id, name, email, createdAt FROM users WHERE approved = false AND isAdmin = false'
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get pending users error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Approve user (admin only)
-app.post('/api/users/:id/approve', authenticateToken, (req, res) => {
+app.post('/api/users/:id/approve', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  db.run(
-    'UPDATE users SET approved = 1 WHERE id = ?',
-    [req.params.id],
-    (err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json({ success: true });
-    }
-  );
+  try {
+    await pool.query(
+      'UPDATE users SET approved = true WHERE id = $1',
+      [req.params.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Approve user error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Reject/delete user (admin only)
-app.delete('/api/users/:id', authenticateToken, (req, res) => {
+app.delete('/api/users/:id', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  db.run('DELETE FROM users WHERE id = ? AND isAdmin = 0', [req.params.id], (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+  try {
+    await pool.query('DELETE FROM users WHERE id = $1 AND isAdmin = false', [req.params.id]);
     res.json({ success: true });
-  });
-});
-
-// Get all users (for adding to team)
-app.get('/api/users', authenticateToken, (req, res) => {
-  if (!req.user.isAdmin) {
-    return res.status(403).json({ error: 'Admin access required' });
+  } catch (err) {
+    console.error('Delete user error:', err);
+    return res.status(500).json({ error: 'Database error' });
   }
-
-  db.all(
-    `SELECT id, name, email FROM users WHERE isAdmin = 0 
-     AND id NOT IN (SELECT userId FROM team_members)`,
-    [],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(rows);
-    }
-  );
 });
 
 // Mark tutorial as seen
-app.post('/api/users/tutorial-seen', authenticateToken, (req, res) => {
-  db.run(
-    'UPDATE users SET hasSeenTutorial = 1 WHERE id = ?',
-    [req.user.id],
-    (err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json({ success: true });
-    }
-  );
+app.post('/api/users/tutorial-seen', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'UPDATE users SET hasSeenTutorial = true WHERE id = $1',
+      [req.user.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Update tutorial seen error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Email Settings Routes
-app.get('/api/email-settings', authenticateToken, (req, res) => {
-  db.get(
-    'SELECT provider, email, lastSync FROM email_settings WHERE userId = ?',
-    [req.user.id],
-    (err, row) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(row || null);
-    }
-  );
+app.get('/api/email-settings', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      'SELECT provider, email, lastSync FROM email_settings WHERE userId = $1',
+      [req.user.id]
+    );
+    res.json(result.rows[0] || null);
+  } catch (err) {
+    console.error('Get email settings error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
-app.post('/api/email-settings', authenticateToken, (req, res) => {
+app.post('/api/email-settings', authenticateToken, async (req, res) => {
   const { provider, email, appPassword } = req.body;
 
   if (!provider || !email || !appPassword) {
@@ -768,61 +752,64 @@ app.post('/api/email-settings', authenticateToken, (req, res) => {
   // Simple encryption (in production, use proper encryption)
   const encryptedPassword = Buffer.from(appPassword).toString('base64');
 
-  db.run(
-    `INSERT OR REPLACE INTO email_settings (userId, provider, email, appPassword) 
-     VALUES (?, ?, ?, ?)`,
-    [req.user.id, provider, email, encryptedPassword],
-    (err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json({ success: true });
-    }
-  );
+  try {
+    await pool.query(
+      `INSERT INTO email_settings (userId, provider, email, appPassword) 
+       VALUES ($1, $2, $3, $4)
+       ON CONFLICT (userId) 
+       DO UPDATE SET provider = $2, email = $3, appPassword = $4`,
+      [req.user.id, provider, email, encryptedPassword]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Save email settings error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
-app.delete('/api/email-settings', authenticateToken, (req, res) => {
-  db.run(
-    'DELETE FROM email_settings WHERE userId = ?',
-    [req.user.id],
-    (err) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json({ success: true });
-    }
-  );
+app.delete('/api/email-settings', authenticateToken, async (req, res) => {
+  try {
+    await pool.query(
+      'DELETE FROM email_settings WHERE userId = $1',
+      [req.user.id]
+    );
+    res.json({ success: true });
+  } catch (err) {
+    console.error('Delete email settings error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Initialize email scanner
-const emailScanner = new EmailScanner(DB_PATH);
+const emailScanner = new EmailScanner(pool);
 
 // Manual endpoint to create email categories
-app.post('/api/create-email-categories', authenticateToken, (req, res) => {
+app.post('/api/create-email-categories', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  db.get('SELECT id FROM categories WHERE name = ?', ['Corporation Tax Return Emails'], (err, row) => {
-    if (!row) {
-      db.run('INSERT INTO categories (name, createdBy) VALUES (?, ?)', 
-        ['Corporation Tax Return Emails', req.user.id], (err) => {
-          if (err) console.error('Error creating Corp Tax category:', err);
-        });
+  try {
+    // Check for Corporation Tax category
+    let result = await pool.query('SELECT id FROM categories WHERE name = $1', ['Corporation Tax Return Emails']);
+    if (result.rows.length === 0) {
+      await pool.query('INSERT INTO categories (name, createdBy) VALUES ($1, $2)', 
+        ['Corporation Tax Return Emails', req.user.id]);
     }
-  });
 
-  db.get('SELECT id FROM categories WHERE name = ?', ['Self Assessment Emails'], (err, row) => {
-    if (!row) {
-      db.run('INSERT INTO categories (name, createdBy) VALUES (?, ?)', 
-        ['Self Assessment Emails', req.user.id], (err) => {
-          if (err) console.error('Error creating Self Assessment category:', err);
-          else res.json({ success: true, message: 'Email categories created' });
-        });
+    // Check for Self Assessment category
+    result = await pool.query('SELECT id FROM categories WHERE name = $1', ['Self Assessment Emails']);
+    if (result.rows.length === 0) {
+      await pool.query('INSERT INTO categories (name, createdBy) VALUES ($1, $2)', 
+        ['Self Assessment Emails', req.user.id]);
+      res.json({ success: true, message: 'Email categories created' });
     } else {
       res.json({ success: true, message: 'Categories already exist' });
     }
-  });
+  } catch (err) {
+    console.error('Create email categories error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Manual scan trigger endpoint

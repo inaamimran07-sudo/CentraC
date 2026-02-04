@@ -1,42 +1,38 @@
 const imaps = require('imap-simple');
 const { simpleParser } = require('mailparser');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 
 class EmailScanner {
-  constructor(dbPath) {
-    this.db = new sqlite3.Database(dbPath);
+  constructor(pool) {
+    this.pool = pool;
     this.scanningUsers = new Map(); // Track which users are being scanned
   }
 
   async scanAllUsers() {
-    return new Promise((resolve, reject) => {
-      this.db.all(
-        'SELECT userId, provider, email, appPassword, lastSync FROM email_settings',
-        [],
-        async (err, rows) => {
-          if (err) {
-            console.error('Error fetching email settings:', err);
-            return reject(err);
-          }
-
-          console.log(`📧 Scanning emails for ${rows.length} users...`);
-          
-          for (const settings of rows) {
-            try {
-              await this.scanUserEmails(settings);
-            } catch (error) {
-              console.error(`Error scanning emails for user ${settings.userId}:`, error.message);
-            }
-          }
-          
-          resolve();
-        }
+    try {
+      const result = await this.pool.query(
+        'SELECT userId, provider, email, appPassword, lastSync FROM email_settings'
       );
-    });
+
+      console.log(`📧 Scanning emails for ${result.rows.length} users...`);
+      
+      for (const settings of result.rows) {
+        try {
+          await this.scanUserEmails(settings);
+        } catch (error) {
+          console.error(`Error scanning emails for user ${settings.userid}:`, error.message);
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching email settings:', err);
+      throw err;
+    }
   }
 
   async scanUserEmails(settings) {
-    const { userId, provider, email, appPassword, lastSync } = settings;
+    const { userid, provider, email, apppassword, lastsync } = settings;
+    const userId = userid;
+    const appPassword = apppassword;
 
     // Prevent scanning the same user multiple times simultaneously
     if (this.scanningUsers.has(userId)) {
@@ -87,8 +83,8 @@ class EmailScanner {
       connection.end();
 
       // Update last sync time
-      this.db.run(
-        'UPDATE email_settings SET lastSync = CURRENT_TIMESTAMP WHERE userId = ?',
+      await this.pool.query(
+        'UPDATE email_settings SET lastSync = CURRENT_TIMESTAMP WHERE userId = $1',
         [userId]
       );
 
@@ -194,111 +190,109 @@ class EmailScanner {
 
       console.log(`📨 Processing email for category: ${matchedCategoryName}`);
 
-      this.db.get(
-        'SELECT id FROM categories WHERE name = ?',
-        [matchedCategoryName],
-        (err, category) => {
-          if (err || !category) {
-            console.error('Category not found:', matchedCategoryName);
-            return;
-          }
+      try {
+        const categoryResult = await this.pool.query(
+          'SELECT id FROM categories WHERE name = $1',
+          [matchedCategoryName]
+        );
 
-          // Check if we already have this email (by subject and sender email)
-          this.db.get(
-            `SELECT id FROM subcategories 
-             WHERE categoryId = ? AND companyName = ? AND description LIKE ?`,
-            [category.id, subject.substring(0, 100), `%${fromEmail}%`],
-            (err, existing) => {
-              if (existing) {
-                console.log(`⏭️  Email already exists: ${subject}`);
-                return;
-              }
-
-              // Try to extract company year end date from email content
-              const yearEndDate = this.extractYearEndDate(emailText);
-              
-              // Build detailed description
-              let description = `📧 EMAIL FROM: ${from}\n`;
-              description += `📨 EMAIL ADDRESS: ${fromEmail}\n`;
-              description += `📅 DATE: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}\n`;
-              description += `🏷️  CATEGORY: ${matchedCategoryName}\n`;
-              if (yearEndDate) {
-                description += `📆 COMPANY YEAR END: ${yearEndDate.toLocaleDateString()}\n`;
-              }
-              description += `\n`;
-              
-              if (attachments.length > 0) {
-                description += `📎 ATTACHMENTS (${attachments.length}):\n${attachmentsList}\n\n`;
-              }
-              
-              description += `📄 EMAIL CONTENT:\n`;
-              description += `${'-'.repeat(50)}\n`;
-              description += emailText.substring(0, 2000); // Limit to 2000 chars
-              if (emailText.length > 2000) {
-                description += '\n... (content truncated)';
-              }
-              description += `\n${'-'.repeat(50)}\n\n`;
-              description += `[Auto-created from email scan]`;
-
-              // Calculate due date based on UK accountancy deadlines
-              const dueDate = new Date();
-              if (yearEndDate) {
-                dueDate.setTime(yearEndDate.getTime());
-                if (matchedCategoryName === 'Corporation Tax Return Emails') {
-                  // UK CT600 filing deadline: 12 months after accounting period end
-                  dueDate.setMonth(dueDate.getMonth() + 12);
-                } else {
-                  // UK Self Assessment: January 31st following the tax year end
-                  // Tax year ends April 5th, deadline is January 31st of the next year
-                  // If date is between April 6 and Dec 31, deadline is Jan 31 next year
-                  // If date is between Jan 1 and April 5, deadline is Jan 31 same year (already passed for current year, so next)
-                  const yearEndMonth = yearEndDate.getMonth();
-                  const yearEndDay = yearEndDate.getDate();
-                  
-                  // Tax year runs April 6 to April 5
-                  // If we're on or before April 5, deadline is Jan 31 of the following year
-                  // If we're after April 5, deadline is Jan 31 of the year after next
-                  if (yearEndMonth < 3 || (yearEndMonth === 3 && yearEndDay <= 5)) {
-                    // Before or on April 5: deadline is Jan 31 next year
-                    dueDate.setFullYear(yearEndDate.getFullYear() + 1);
-                  } else {
-                    // After April 5: deadline is Jan 31 of year after next
-                    dueDate.setFullYear(yearEndDate.getFullYear() + 2);
-                  }
-                  dueDate.setMonth(0); // January
-                  dueDate.setDate(31); // 31st
-                }
-              } else {
-                // Default: 6 months from now if no year end found
-                dueDate.setMonth(dueDate.getMonth() + 6);
-              }
-
-              this.db.run(
-                `INSERT INTO subcategories 
-                 (categoryId, companyName, description, assignedToUserId, priority, progress, dueDate, createdBy) 
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                  category.id,
-                  subject.substring(0, 100), // Company name = subject
-                  description,
-                  null, // Not assigned yet
-                  'medium',
-                  'not-started',
-                  dueDate.toISOString().split('T')[0],
-                  userId
-                ],
-                function(err) {
-                  if (err) {
-                    console.error('Error creating subcategory from email:', err);
-                  } else {
-                    console.log(`✨ Created new account from email: ${subject} → ${matchedCategoryName}`);
-                  }
-                }
-              );
-            }
-          );
+        if (categoryResult.rows.length === 0) {
+          console.error('Category not found:', matchedCategoryName);
+          return;
         }
-      );
+
+        const category = categoryResult.rows[0];
+
+        // Check if we already have this email (by subject and sender email)
+        const existingResult = await this.pool.query(
+          `SELECT id FROM subcategories 
+           WHERE categoryId = $1 AND companyName = $2 AND description LIKE $3`,
+          [category.id, subject.substring(0, 100), `%${fromEmail}%`]
+        );
+
+        if (existingResult.rows.length > 0) {
+          console.log(`⏭️  Email already exists: ${subject}`);
+          return;
+        }
+
+        // Try to extract company year end date from email content
+        const yearEndDate = this.extractYearEndDate(emailText);
+        
+        // Build detailed description
+        let description = `📧 EMAIL FROM: ${from}\n`;
+        description += `📨 EMAIL ADDRESS: ${fromEmail}\n`;
+        description += `📅 DATE: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}\n`;
+        description += `🏷️  CATEGORY: ${matchedCategoryName}\n`;
+        if (yearEndDate) {
+          description += `📆 COMPANY YEAR END: ${yearEndDate.toLocaleDateString()}\n`;
+        }
+        description += `\n`;
+        
+        if (attachments.length > 0) {
+          description += `📎 ATTACHMENTS (${attachments.length}):\n${attachmentsList}\n\n`;
+        }
+        
+        description += `📄 EMAIL CONTENT:\n`;
+        description += `${'-'.repeat(50)}\n`;
+        description += emailText.substring(0, 2000); // Limit to 2000 chars
+        if (emailText.length > 2000) {
+          description += '\n... (content truncated)';
+        }
+        description += `\n${'-'.repeat(50)}\n\n`;
+        description += `[Auto-created from email scan]`;
+
+        // Calculate due date based on UK accountancy deadlines
+        const dueDate = new Date();
+        if (yearEndDate) {
+          dueDate.setTime(yearEndDate.getTime());
+          if (matchedCategoryName === 'Corporation Tax Return Emails') {
+            // UK CT600 filing deadline: 12 months after accounting period end
+            dueDate.setMonth(dueDate.getMonth() + 12);
+          } else {
+            // UK Self Assessment: January 31st following the tax year end
+            // Tax year ends April 5th, deadline is January 31st of the next year
+            // If date is between April 6 and Dec 31, deadline is Jan 31 next year
+            // If date is between Jan 1 and April 5, deadline is Jan 31 same year (already passed for current year, so next)
+            const yearEndMonth = yearEndDate.getMonth();
+            const yearEndDay = yearEndDate.getDate();
+            
+            // Tax year runs April 6 to April 5
+            // If we're on or before April 5, deadline is Jan 31 of the following year
+            // If we're after April 5, deadline is Jan 31 of the year after next
+            if (yearEndMonth < 3 || (yearEndMonth === 3 && yearEndDay <= 5)) {
+              // Before or on April 5: deadline is Jan 31 next year
+              dueDate.setFullYear(yearEndDate.getFullYear() + 1);
+            } else {
+              // After April 5: deadline is Jan 31 of year after next
+              dueDate.setFullYear(yearEndDate.getFullYear() + 2);
+            }
+            dueDate.setMonth(0); // January
+            dueDate.setDate(31); // 31st
+          }
+        } else {
+          // Default: 6 months from now if no year end found
+          dueDate.setMonth(dueDate.getMonth() + 6);
+        }
+
+        await this.pool.query(
+          `INSERT INTO subcategories 
+           (categoryId, companyName, description, assignedToUserId, priority, progress, dueDate, createdBy) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+          [
+            category.id,
+            subject.substring(0, 100), // Company name = subject
+            description,
+            null, // Not assigned yet
+            'medium',
+            'not-started',
+            dueDate.toISOString().split('T')[0],
+            userId
+          ]
+        );
+        console.log(`✨ Created new account from email: ${subject} → ${matchedCategoryName}`);
+      } catch (error) {
+        console.error('Error processing email category:', error);
+      }
     } catch (error) {
       console.error('Error processing email:', error);
     }
@@ -357,7 +351,8 @@ class EmailScanner {
   }
 
   close() {
-    this.db.close();
+    // PostgreSQL pool will be closed by the main server
+    // No action needed here
   }
 }
 
