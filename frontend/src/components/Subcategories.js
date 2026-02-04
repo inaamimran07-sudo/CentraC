@@ -108,6 +108,13 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
     return '';
   };
 
+  const getPriorityBorder = (priority) => {
+    if (priority === 'high') return 'priority-border-high';
+    if (priority === 'medium') return 'priority-border-medium';
+    if (priority === 'low') return 'priority-border-low';
+    return 'priority-border-low';
+  };
+
   const getProgressClass = (progress) => {
     if (progress === 'completed') return 'progress-completed';
     if (progress === 'completed-not-submitted') return 'progress-completed-not-submitted';
@@ -165,7 +172,7 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
           filteredSubcategories.map(sub => (
             <div
               key={sub.id}
-              className={`subcategory-card ${getProgressClass(sub.progress)} ${getPriorityFlash(sub.autoPriority || sub.priority)}`}
+              className={`subcategory-card ${getPriorityBorder(sub.autoPriority || sub.priority)} ${getPriorityFlash(sub.autoPriority || sub.priority)}`}
             >
               <div className="subcategory-date">
                 Due: {new Date(sub.dueDate).toLocaleDateString()}

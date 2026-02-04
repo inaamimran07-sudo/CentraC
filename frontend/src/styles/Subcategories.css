@@ -123,20 +123,16 @@
   transform: translateY(-5px);
 }
 
-.subcategory-card.progress-completed {
-  border-left: 8px solid #2ecc71;
+.subcategory-card.priority-border-high {
+  border-left: 8px solid #e74c3c;
 }
 
-.subcategory-card.progress-completed-not-submitted {
-  border-left: 8px solid #4b6cff;
-}
-
-.subcategory-card.progress-in-progress {
+.subcategory-card.priority-border-medium {
   border-left: 8px solid #f39c12;
 }
 
-.subcategory-card.progress-not-started {
-  border-left: 8px solid #e74c3c;
+.subcategory-card.priority-border-low {
+  border-left: 8px solid #2ecc71;
 }
 
 .subcategory-top {
