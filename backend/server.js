@@ -26,32 +26,35 @@ const pool = new Pool({
   connectionTimeoutMillis: 10000,
 });
 
-// CORS Configuration
+// ========================================
+// CORS CONFIGURATION - MUST BE FIRST!
+// ========================================
 const allowedOrigins = [
   'https://centrac-frontend.onrender.com',
   'http://localhost:3000',
-  'http://localhost:3001'
+  'http://localhost:5173'
 ];
 
 app.use(cors({
-  origin: function(origin, callback) {
+  origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log('Blocked by CORS:', origin);
-      callback(null, true); // Still allow for now, but log it
+    if (allowedOrigins.indexOf(origin) === -1) {
+      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
     }
+    return callback(null, true);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Type', 'Authorization'],
-  preflightContinue: false,
-  optionsSuccessStatus: 204
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600
 }));
+
+// Handle preflight requests explicitly
+app.options('*', cors());
 
 app.use(bodyParser.json());
 
