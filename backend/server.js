@@ -13,25 +13,12 @@ const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-in-producti
 const PORT = process.env.PORT || 5000;
 
 // Middleware
-const allowedOrigins = [
-  'https://centrac-frontend.onrender.com',
-  'http://localhost:3000',
-  process.env.FRONTEND_URL
-].filter(Boolean);
-
 app.use(cors({
-  origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
-      callback(null, true);
-    } else {
-      callback(new Error('Not allowed by CORS'));
-    }
-  },
+  origin: ['https://centrac-frontend.onrender.com', 'http://localhost:3000'],
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use(bodyParser.json());
@@ -893,7 +880,7 @@ setTimeout(async () => {
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
-  console.log(`🌐 CORS allowed origins:`, allowedOrigins);
+  console.log(`🌐 CORS enabled for: centrac-frontend.onrender.com`);
   console.log(`🗄️  Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
   console.log(`📧 Email scanner active - checking every ${SCAN_INTERVAL / 60000} minutes`);
   console.log(`✅ Server ready to accept connections`);
