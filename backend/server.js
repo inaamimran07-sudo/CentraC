@@ -823,6 +823,22 @@ app.delete('/api/email-settings', authenticateToken, (req, res) => {
 // Initialize email scanner
 const emailScanner = new EmailScanner('./app.db');
 
+// Manual scan trigger endpoint
+app.post('/api/scan-emails', authenticateToken, async (req, res) => {
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+  
+  try {
+    console.log('🔄 Manual email scan triggered by admin');
+    await emailScanner.scanAllUsers();
+    res.json({ success: true, message: 'Email scan completed' });
+  } catch (error) {
+    console.error('Manual scan error:', error);
+    res.status(500).json({ error: 'Scan failed: ' + error.message });
+  }
+});
+
 // Scan emails every 5 minutes
 const SCAN_INTERVAL = 5 * 60 * 1000; // 5 minutes
 setInterval(async () => {

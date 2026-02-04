@@ -70,6 +70,22 @@ function EmailSettings() {
     }
   };
 
+  const handleScanNow = async () => {
+    setLoading(true);
+    setMessage('');
+    
+    try {
+      await axios.post('/api/scan-emails', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setMessage('✓ Email scan completed! Check Email Categories for new accounts.');
+    } catch (err) {
+      setMessage('✗ Error scanning: ' + (err.response?.data?.error || 'Unknown error'));
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="email-settings">
       <div className="section-header">
@@ -83,9 +99,14 @@ function EmailSettings() {
             <p><strong>Provider:</strong> {settings.provider === 'gmail' ? 'Gmail' : 'Outlook'}</p>
             <p><strong>Email:</strong> {settings.email}</p>
             <p><strong>Status:</strong> Scanning emails every 5 minutes for keywords</p>
-            <button onClick={handleDisconnect} className="disconnect-btn">
-              Disconnect Email
-            </button>
+            <div className="button-group">
+              <button onClick={handleScanNow} disabled={loading} className="scan-btn">
+                {loading ? 'Scanning...' : '🔄 Scan Now'}
+              </button>
+              <button onClick={handleDisconnect} className="disconnect-btn">
+                Disconnect Email
+              </button>
+            </div>
           </div>
         ) : (
           <form onSubmit={handleSave} className="settings-form">

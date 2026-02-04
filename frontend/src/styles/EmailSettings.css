@@ -31,8 +31,35 @@
   font-size: 1rem;
 }
 
-.disconnect-btn {
+.button-group {
+  display: flex;
+  gap: 1rem;
+  justify-content: center;
   margin-top: 1.5rem;
+}
+
+.scan-btn {
+  padding: 0.75rem 1.5rem;
+  background: #4b6cff;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: background 0.2s;
+}
+
+.scan-btn:hover:not(:disabled) {
+  background: #3a54cc;
+}
+
+.scan-btn:disabled {
+  background: #ccc;
+  cursor: not-allowed;
+}
+
+.disconnect-btn {
   padding: 0.75rem 1.5rem;
   background: #dc3545;
   color: white;
