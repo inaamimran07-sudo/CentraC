@@ -255,9 +255,7 @@ app.post('/api/auth/login', async (req, res) => {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    if (!user.approved && !user.isadmin) {
-      return res.status(403).json({ error: 'Your account is pending admin approval' });
-    }
+    // REMOVED APPROVAL CHECK - LET EVERYONE IN FOR NOW
 
     const token = jwt.encode(
       { id: user.id, email: user.email, name: user.name, isAdmin: user.isadmin },
@@ -293,12 +291,12 @@ app.post('/api/auth/register', async (req, res) => {
   try {
     await pool.query(
       'INSERT INTO users (email, password, name, isAdmin, approved) VALUES ($1, $2, $3, $4, $5)',
-      [email, hashedPassword, name, false, false]
+      [email, hashedPassword, name, false, true]
     );
 
     res.status(201).json({
-      message: 'Account created! Waiting for admin approval.',
-      pending: true
+      message: 'Account created! You can now login.',
+      pending: false
     });
   } catch (err) {
     console.error('Register error:', err);
