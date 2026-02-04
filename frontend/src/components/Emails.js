@@ -1,14 +1,37 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import axios from '../axiosConfig';
 import Subcategories from './Subcategories';
 import '../styles/Categories.css';
 
 function Emails({ isAdmin, token, userId, onRefresh }) {
   const [selectedCategory, setSelectedCategory] = useState('Corporation Tax Return Emails');
+  const [categories, setCategories] = useState([]);
+  const [loading, setLoading] = useState(true);
 
-  const emailCategories = [
-    { id: 'corp-tax-emails', name: 'Corporation Tax Return Emails' },
-    { id: 'self-assessment-emails', name: 'Self Assessment Emails' }
-  ];
+  useEffect(() => {
+    fetchCategories();
+  }, []);
+
+  const fetchCategories = async () => {
+    try {
+      const response = await axios.get('/api/categories', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      // Filter to only email categories
+      const emailCategories = response.data.filter(cat => 
+        cat.name === 'Corporation Tax Return Emails' || cat.name === 'Self Assessment Emails'
+      );
+      setCategories(emailCategories);
+      setLoading(false);
+    } catch (err) {
+      console.error('Error fetching categories:', err);
+      setLoading(false);
+    }
+  };
+
+  const getCategory = (name) => {
+    return categories.find(cat => cat.name === name);
+  };
 
   return (
     <div
@@ -25,42 +48,48 @@ function Emails({ isAdmin, token, userId, onRefresh }) {
         <h2>Email Categories</h2>
       </div>
 
-      <div className="categories-tabs">
-        {emailCategories.map(cat => (
-          <button
-            key={cat.id}
-            className={`category-tab ${selectedCategory === cat.name ? 'active' : ''}`}
-            onClick={() => setSelectedCategory(cat.name)}
-          >
-            {cat.name}
-          </button>
-        ))}
-      </div>
+      {loading ? (
+        <div className="loading">Loading...</div>
+      ) : (
+        <>
+          <div className="categories-tabs">
+            {categories.map(cat => (
+              <button
+                key={cat.id}
+                className={`category-tab ${selectedCategory === cat.name ? 'active' : ''}`}
+                onClick={() => setSelectedCategory(cat.name)}
+              >
+                {cat.name}
+              </button>
+            ))}
+          </div>
 
-      <div className="categories-content">
-        {selectedCategory === 'Corporation Tax Return Emails' && (
-          <Subcategories
-            categoryId="corp-tax-emails"
-            categoryName="Corporation Tax Return Emails"
-            isAdmin={isAdmin}
-            token={token}
-            userId={userId}
-            onRefresh={onRefresh}
-            isEmailCategory={true}
-          />
-        )}
-        {selectedCategory === 'Self Assessment Emails' && (
-          <Subcategories
-            categoryId="self-assessment-emails"
-            categoryName="Self Assessment Emails"
-            isAdmin={isAdmin}
-            token={token}
-            userId={userId}
-            onRefresh={onRefresh}
-            isEmailCategory={true}
-          />
-        )}
-      </div>
+          <div className="categories-content">
+            {selectedCategory === 'Corporation Tax Return Emails' && getCategory('Corporation Tax Return Emails') && (
+              <Subcategories
+                categoryId={getCategory('Corporation Tax Return Emails').id}
+                categoryName="Corporation Tax Return Emails"
+                isAdmin={isAdmin}
+                token={token}
+                userId={userId}
+                onRefresh={onRefresh}
+                isEmailCategory={true}
+              />
+            )}
+            {selectedCategory === 'Self Assessment Emails' && getCategory('Self Assessment Emails') && (
+              <Subcategories
+                categoryId={getCategory('Self Assessment Emails').id}
+                categoryName="Self Assessment Emails"
+                isAdmin={isAdmin}
+                token={token}
+                userId={userId}
+                onRefresh={onRefresh}
+                isEmailCategory={true}
+              />
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 }
