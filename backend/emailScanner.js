@@ -132,17 +132,17 @@ class EmailScanner {
 
       // Check for keywords - prioritize specific matches
       const keywords = {
-        'corporation tax return': 'Corporation Tax Returns',
-        'corporation tax': 'Corporation Tax Returns',
-        'corp tax return': 'Corporation Tax Returns',
-        'corp tax': 'Corporation Tax Returns',
-        'ct600': 'Corporation Tax Returns',
-        'corporate tax': 'Corporation Tax Returns',
-        'self assessment': 'Self Assessments',
-        'self-assessment': 'Self Assessments',
-        'sa100': 'Self Assessments',
-        'sa return': 'Self Assessments',
-        'personal tax return': 'Self Assessments'
+        'corporation tax return': 'Corporation Tax Return Emails',
+        'corporation tax': 'Corporation Tax Return Emails',
+        'corp tax return': 'Corporation Tax Return Emails',
+        'corp tax': 'Corporation Tax Return Emails',
+        'ct600': 'Corporation Tax Return Emails',
+        'corporate tax': 'Corporation Tax Return Emails',
+        'self assessment': 'Self Assessment Emails',
+        'self-assessment': 'Self Assessment Emails',
+        'sa100': 'Self Assessment Emails',
+        'sa return': 'Self Assessment Emails',
+        'personal tax return': 'Self Assessment Emails'
       };
 
       const textContent = `${subject} ${emailText}`.toLowerCase();

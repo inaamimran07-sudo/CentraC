@@ -192,6 +192,43 @@ function initializeDatabase() {
         }
       }
     );
+
+    // Create email categories
+    db.get(
+      `SELECT id FROM categories WHERE name = 'Corporation Tax Return Emails'`,
+      (err, row) => {
+        if (!row) {
+          db.run(
+            `INSERT INTO categories (name, createdBy) 
+             SELECT ?, id FROM users WHERE email = ? AND isAdmin = 1 LIMIT 1`,
+            ['Corporation Tax Return Emails', adminEmail],
+            (err) => {
+              if (!err) {
+                console.log('Corporation Tax Return Emails category created');
+              }
+            }
+          );
+        }
+      }
+    );
+
+    db.get(
+      `SELECT id FROM categories WHERE name = 'Self Assessment Emails'`,
+      (err, row) => {
+        if (!row) {
+          db.run(
+            `INSERT INTO categories (name, createdBy) 
+             SELECT ?, id FROM users WHERE email = ? AND isAdmin = 1 LIMIT 1`,
+            ['Self Assessment Emails', adminEmail],
+            (err) => {
+              if (!err) {
+                console.log('Self Assessment Emails category created');
+              }
+            }
+          );
+        }
+      }
+    );
   });
 }
 
