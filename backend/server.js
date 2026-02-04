@@ -12,6 +12,20 @@ const app = express();
 const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-in-production';
 const PORT = process.env.PORT || 5000;
 
+// Database setup - PostgreSQL (MUST BE BEFORE ROUTES)
+if (!process.env.DATABASE_URL) {
+  console.error('⚠️  DATABASE_URL environment variable is not set!');
+  process.exit(1);
+}
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
+});
+
 // CORS - Manual headers (credentials=false to allow wildcard)
 app.use((req, res, next) => {
   res.header('Access-Control-Allow-Origin', '*');
@@ -66,20 +80,6 @@ app.get('/api/check-admin', async (req, res) => {
   } catch (err) {
     res.status(500).json({ error: err.message });
   }
-});
-
-// Database setup - PostgreSQL
-if (!process.env.DATABASE_URL) {
-  console.error('⚠️  DATABASE_URL environment variable is not set!');
-  process.exit(1);
-}
-
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
-  max: 20,
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 10000,
 });
 
 pool.on('connect', () => {
