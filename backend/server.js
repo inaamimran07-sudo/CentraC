@@ -115,12 +115,13 @@ async function initializeDatabase() {
     await pool.query(`
       CREATE TABLE IF NOT EXISTS email_settings (
         id SERIAL PRIMARY KEY,
-        userId INTEGER UNIQUE NOT NULL,
+        userId INTEGER NOT NULL,
         provider VARCHAR(50) NOT NULL,
         email VARCHAR(255) NOT NULL,
         appPassword TEXT NOT NULL,
         lastSync TIMESTAMP,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(userId),
         FOREIGN KEY(userId) REFERENCES users(id)
       )
     `);
@@ -753,11 +754,13 @@ app.post('/api/email-settings', authenticateToken, async (req, res) => {
   const encryptedPassword = Buffer.from(appPassword).toString('base64');
 
   try {
+    // First, try to delete existing settings for this user
+    await pool.query('DELETE FROM email_settings WHERE userId = $1', [req.user.id]);
+    
+    // Then insert new settings
     await pool.query(
       `INSERT INTO email_settings (userId, provider, email, appPassword) 
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (userId) 
-       DO UPDATE SET provider = $2, email = $3, appPassword = $4`,
+       VALUES ($1, $2, $3, $4)`,
       [req.user.id, provider, email, encryptedPassword]
     );
     res.json({ success: true });
