@@ -19,12 +19,13 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
-// Database setup
-const db = new sqlite3.Database('./app.db', (err) => {
+// Database setup - use persistent disk on Render
+const DB_PATH = process.env.DATABASE_PATH || './app.db';
+const db = new sqlite3.Database(DB_PATH, (err) => {
   if (err) {
     console.error('Error opening database:', err);
   } else {
-    console.log('Connected to SQLite database');
+    console.log(`Connected to SQLite database at ${DB_PATH}`);
     initializeDatabase();
   }
 });
@@ -858,7 +859,7 @@ app.delete('/api/email-settings', authenticateToken, (req, res) => {
 });
 
 // Initialize email scanner
-const emailScanner = new EmailScanner('./app.db');
+const emailScanner = new EmailScanner(DB_PATH);
 
 // Manual endpoint to create email categories
 app.post('/api/create-email-categories', authenticateToken, (req, res) => {
