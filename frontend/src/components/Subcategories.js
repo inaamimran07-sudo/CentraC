@@ -6,6 +6,8 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
   const [subcategories, setSubcategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [showDescriptionModal, setShowDescriptionModal] = useState(false);
+  const [selectedDescription, setSelectedDescription] = useState('');
   const [filterByUser, setFilterByUser] = useState(false);
   const [teamMembers, setTeamMembers] = useState([]);
   const [priorityFilter, setPriorityFilter] = useState('all');
@@ -228,14 +230,19 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
                 <div className="detail-item">
                   <label>Description:</label>
                   <textarea
-                    className="inline-textarea"
+                    className="inline-textarea clickable-description"
                     defaultValue={sub.description || ''}
+                    onClick={() => {
+                      setSelectedDescription(sub.description || '');
+                      setShowDescriptionModal(true);
+                    }}
                     onBlur={(e) => {
                       if (e.target.value !== (sub.description || '')) {
                         handleUpdateSubcategory(sub.id, { description: e.target.value });
                       }
                     }}
                     rows="2"
+                    placeholder="Click to view full description"
                   />
                 </div>
                 <div className="detail-item">
@@ -357,6 +364,24 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {showDescriptionModal && (
+        <div className="modal-overlay" onClick={() => setShowDescriptionModal(false)}>
+          <div className="description-modal" onClick={(e) => e.stopPropagation()}>
+            <button 
+              className="close-btn" 
+              onClick={() => setShowDescriptionModal(false)}
+              aria-label="Close"
+            >
+              ✕
+            </button>
+            <h3>Description</h3>
+            <div className="description-content">
+              <pre>{selectedDescription}</pre>
+            </div>
           </div>
         </div>
       )}

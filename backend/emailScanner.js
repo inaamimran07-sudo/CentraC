@@ -213,7 +213,7 @@ class EmailScanner {
               const dueDate = new Date();
               if (yearEndDate) {
                 dueDate.setTime(yearEndDate.getTime());
-                if (matchedCategoryName === 'Corporation Tax Returns') {
+                if (matchedCategoryName === 'Corporation Tax Return Emails') {
                   // UK CT600 filing deadline: 12 months after accounting period end
                   dueDate.setMonth(dueDate.getMonth() + 12);
                 } else {
