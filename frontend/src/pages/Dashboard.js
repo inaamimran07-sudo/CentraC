@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useContext } from 'react';
 import axios from '../axiosConfig';
 import { AuthContext } from '../context/AuthContext';
-import API_URL from '../config';
 import TeamMembers from '../components/TeamMembers';
 import Categories from '../components/Categories';
 import Calendar from '../components/Calendar';
@@ -29,7 +28,7 @@ function Dashboard() {
   useEffect(() => {
     const fetchProgressStats = async () => {
       try {
-        const response = await axios.get(API_URL + '/api/stats/progress', {
+        const response = await axios.get('/api/stats/progress', {
           headers: { Authorization: `Bearer ${token}` }
         });
         setProgressStats(response.data);

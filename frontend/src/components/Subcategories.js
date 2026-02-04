@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../axiosConfig';
-import API_URL from '../config';
 import '../styles/Subcategories.css';
 
 function Subcategories({ categoryId, token, userId, onRefresh }) {
@@ -26,7 +25,7 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
 
   const fetchTeamMembers = async () => {
     try {
-      const response = await axios.get(API_URL + '/api/team-members', {
+      const response = await axios.get('/api/team-members', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTeamMembers(response.data);
@@ -38,7 +37,7 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
   const fetchSubcategories = async () => {
     try {
       const response = await axios.get(
-        API_URL + `/api/categories/${categoryId}/subcategories?filterByUser=${filterByUser}`,
+        `/api/categories/${categoryId}/subcategories?filterByUser=${filterByUser}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       setSubcategories(response.data);
@@ -58,7 +57,7 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
 
     try {
       await axios.post(
-        API_URL + '/api/subcategories',
+        '/api/subcategories',
         { categoryId, ...formData },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -74,7 +73,7 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
   const handleUpdateSubcategory = async (id, updates) => {
     try {
       await axios.put(
-        API_URL + `/api/subcategories/${id}`,
+        `/api/subcategories/${id}`,
         updates,
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -92,7 +91,7 @@ function Subcategories({ categoryId, token, userId, onRefresh }) {
     const secondConfirm = window.confirm('Are you absolutely sure you want to delete this account?');
     if (!secondConfirm) return;
     try {
-      await axios.delete(API_URL + `/api/subcategories/${id}`, {
+      await axios.delete(`/api/subcategories/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchSubcategories();

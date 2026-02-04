@@ -1,7 +1,6 @@
 import React, { useState, useContext } from 'react';
 import axios from '../axiosConfig';
 import { AuthContext } from '../context/AuthContext';
-import API_URL from '../config';
 import '../styles/LoginPage.css';
 
 function LoginPage() {
@@ -26,8 +25,8 @@ function LoginPage() {
         ? { email, password, name }
         : { email, password };
 
-      console.log('Sending login request to:', API_URL + endpoint, 'with data:', data);
-      const response = await axios.post(API_URL + endpoint, data);
+      console.log('Sending login request to:', endpoint, 'with data:', data);
+      const response = await axios.post(endpoint, data);
       console.log('Login response:', response.data);
       
       if (isRegister && response.data.pending) {

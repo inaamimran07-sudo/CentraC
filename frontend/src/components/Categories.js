@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from '../axiosConfig';
-import API_URL from '../config';
 import Subcategories from './Subcategories';
 import '../styles/Categories.css';
 
@@ -17,7 +16,7 @@ function Categories({ isAdmin, token, userId, onRefresh }) {
 
   const fetchCategories = async () => {
     try {
-      const response = await axios.get(API_URL + '/api/categories', {
+      const response = await axios.get('/api/categories', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setCategories(response.data);
@@ -37,7 +36,7 @@ function Categories({ isAdmin, token, userId, onRefresh }) {
 
     try {
       await axios.post(
-        API_URL + '/api/categories',
+        '/api/categories',
         { name: newCategoryName },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -57,7 +56,7 @@ function Categories({ isAdmin, token, userId, onRefresh }) {
     const secondConfirm = window.confirm('Are you absolutely sure? All data will be permanently deleted!');
     if (!secondConfirm) return;
     try {
-      await axios.delete(API_URL + `/api/categories/${id}`, {
+      await axios.delete(`/api/categories/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchCategories();
