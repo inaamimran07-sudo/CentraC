@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 150">
+  <!-- Black C shape -->
+  <path d="M 85 75 C 85 95 75 110 55 110 C 35 110 25 95 25 75 C 25 55 35 40 55 40 C 65 40 73 44 78 50" 
+        fill="none" stroke="#000000" stroke-width="12" stroke-linecap="round"/>
+  
+  <!-- Gray infinity symbol -->
+  <path d="M 120 75 C 120 85 125 90 135 90 C 145 90 150 85 150 75 C 150 65 145 60 135 60 C 125 60 120 65 120 75 Z" 
+        fill="#AAAAAA"/>
+  <path d="M 150 75 C 150 65 155 60 165 60 C 175 60 180 65 180 75 C 180 85 175 90 165 90 C 155 90 150 85 150 75 Z" 
+        fill="#AAAAAA"/>
+  
+  <!-- "Centra" text in gray -->
+  <text x="190" y="85" font-family="Arial, sans-serif" font-size="42" font-weight="bold" fill="#888888">Centra</text>
+  
+  <!-- "consultants" text in gray, smaller -->
+  <text x="190" y="105" font-family="Arial, sans-serif" font-size="18" font-weight="normal" fill="#888888" letter-spacing="2">consultants</text>
+</svg>

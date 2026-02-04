@@ -1,0 +1,51 @@
+# Node modules
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Database
+*.db
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Build outputs
+build/
+dist/
+.next/
+out/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# React
+.env.development.local
+.env.test.local
+.env.production.local
+
+# Logs
+logs/
+*.log
+
+# Cache
+.cache/
+.eslintcache
+
+# Frontend specific
+/frontend/node_modules
+/frontend/build
+/frontend/dist
+
+# Backend specific
+/backend/node_modules
+/backend/app.db
