@@ -66,9 +66,8 @@ class EmailScanner {
       const connection = await imaps.connect(config);
       await connection.openBox('INBOX');
 
-      // Search for unread emails from the last 7 days
+      // TEMPORARY: Search for ALL emails from the last 7 days (not just unread)
       const searchCriteria = [
-        'UNSEEN',
         ['SINCE', this.getDateSevenDaysAgo()]
       ];
 
@@ -79,7 +78,7 @@ class EmailScanner {
       };
 
       const messages = await connection.search(searchCriteria, fetchOptions);
-      console.log(`📨 Found ${messages.length} unread messages for ${email}`);
+      console.log(`📨 Found ${messages.length} messages for ${email} (scanning ALL messages - temporary)`);
 
       for (const item of messages) {
         await this.processEmail(item, userId);
