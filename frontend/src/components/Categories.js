@@ -19,7 +19,11 @@ function Categories({ isAdmin, token, userId, onRefresh }) {
       const response = await axios.get('/api/categories', {
         headers: { Authorization: `Bearer ${token}` }
       });
-      setCategories(response.data);
+      // Filter out email categories from regular Categories section
+      const regularCategories = response.data.filter(cat => 
+        cat.name !== 'Corporation Tax Return Emails' && cat.name !== 'Self Assessment Emails'
+      );
+      setCategories(regularCategories);
       setLoading(false);
     } catch (err) {
       console.error('Error fetching categories:', err);
