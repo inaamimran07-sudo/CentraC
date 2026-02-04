@@ -200,11 +200,21 @@ class EmailScanner {
               description += `\n${'-'.repeat(50)}\n\n`;
               description += `[Auto-created from email scan]`;
 
-              // Calculate due date: 9 months after year end, or 6 months from now if year end not found
+              // Calculate due date based on category type
               const dueDate = new Date();
               if (yearEndDate) {
                 dueDate.setTime(yearEndDate.getTime());
-                dueDate.setMonth(dueDate.getMonth() + 9); // 9 months after year end
+                if (matchedCategoryName === 'Corporation Tax Returns') {
+                  // CT600: 12 months after accounting period end (filing deadline)
+                  dueDate.setMonth(dueDate.getMonth() + 12);
+                } else {
+                  // Self Assessment: January 31st following the tax year
+                  // Tax year ends April 5th, so deadline is next January 31st
+                  const taxYearEnd = new Date(yearEndDate);
+                  dueDate.setFullYear(taxYearEnd.getFullYear() + (taxYearEnd.getMonth() >= 3 ? 1 : 0));
+                  dueDate.setMonth(0); // January
+                  dueDate.setDate(31); // 31st
+                }
               } else {
                 dueDate.setMonth(dueDate.getMonth() + 6); // Default 6 months from now
               }
