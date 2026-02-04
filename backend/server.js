@@ -189,15 +189,18 @@ async function initializeDatabase() {
       )
     `);
 
-    // Create default admin user
+    // Create default admin user (use INSERT ... ON CONFLICT to avoid FK issues)
     const adminEmail = 'inaamimran07@gmail.com';
     const adminPassword = bcrypt.hashSync('Atg9341poL', 10);
     
-    // Delete existing admin if present, then create fresh
-    await pool.query('DELETE FROM users WHERE email = $1', [adminEmail]);
     await pool.query(
       `INSERT INTO users (email, password, name, isAdmin, approved, hasSeenTutorial) 
-       VALUES ($1, $2, $3, $4, $5, $6)`,
+       VALUES ($1, $2, $3, $4, $5, $6)
+       ON CONFLICT (email) 
+       DO UPDATE SET 
+         password = EXCLUDED.password,
+         isAdmin = EXCLUDED.isAdmin,
+         approved = EXCLUDED.approved`,
       [adminEmail, adminPassword, 'Admin', true, true, true]
     );
     console.log('Default admin user ensured');
