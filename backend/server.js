@@ -763,7 +763,8 @@ app.post('/api/email-settings', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Save email settings error:', err);
-    return res.status(500).json({ error: 'Database error' });
+    console.error('Error details:', err.message, err.code);
+    return res.status(500).json({ error: 'Database error: ' + err.message });
   }
 });
 
