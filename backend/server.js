@@ -1,5 +1,5 @@
 const express = require('express');
-const sqlite3 = require('sqlite3').verbose();
+const { Pool } = require('pg');
 const jwt = require('jwt-simple');
 const bcrypt = require('bcryptjs');
 const cors = require('cors');
@@ -19,127 +19,108 @@ app.use(cors({
 }));
 app.use(bodyParser.json());
 
-// Database setup - use persistent disk on Render
-const DB_PATH = process.env.DATABASE_PATH || './app.db';
-const db = new sqlite3.Database(DB_PATH, (err) => {
-  if (err) {
-    console.error('Error opening database:', err);
-  } else {
-    console.log(`Connected to SQLite database at ${DB_PATH}`);
-    initializeDatabase();
-  }
+// Database setup - PostgreSQL
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
 });
 
+pool.on('connect', () => {
+  console.log('Connected to PostgreSQL database');
+});
+
+pool.on('error', (err) => {
+  console.error('Unexpected error on idle client', err);
+  process.exit(-1);
+});
+
+// Initialize database on startup
+initializeDatabase();
+
 // Initialize database tables
-function initializeDatabase() {
-  db.serialize(() => {
+async function initializeDatabase() {
+  try {
     // Users table
-    db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS users (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        email TEXT UNIQUE NOT NULL,
-        password TEXT NOT NULL,
-        name TEXT NOT NULL,
-        isAdmin INTEGER DEFAULT 0,
-        approved INTEGER DEFAULT 0,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+        id SERIAL PRIMARY KEY,
+        email VARCHAR(255) UNIQUE NOT NULL,
+        password VARCHAR(255) NOT NULL,
+        name VARCHAR(255) NOT NULL,
+        isAdmin BOOLEAN DEFAULT FALSE,
+        approved BOOLEAN DEFAULT FALSE,
+        hasSeenTutorial BOOLEAN DEFAULT FALSE,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
     // Team members table
-    db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS team_members (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         userId INTEGER NOT NULL,
-        color TEXT NOT NULL,
+        color VARCHAR(50) NOT NULL,
         addedBy INTEGER NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(userId) REFERENCES users(id),
         FOREIGN KEY(addedBy) REFERENCES users(id)
       )
     `);
 
     // Categories table
-    db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS categories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        name TEXT NOT NULL,
+        id SERIAL PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
         createdBy INTEGER NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(createdBy) REFERENCES users(id)
       )
     `);
 
     // Subcategories table
-    db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS subcategories (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         categoryId INTEGER NOT NULL,
-        companyName TEXT NOT NULL,
+        companyName VARCHAR(255) NOT NULL,
         description TEXT,
         assignedToUserId INTEGER,
-        priority TEXT DEFAULT 'low',
-        progress TEXT DEFAULT 'not-started',
-        dueDate TEXT NOT NULL,
+        priority VARCHAR(50) DEFAULT 'low',
+        progress VARCHAR(50) DEFAULT 'not-started',
+        dueDate DATE NOT NULL,
         createdBy INTEGER NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(categoryId) REFERENCES categories(id),
         FOREIGN KEY(assignedToUserId) REFERENCES users(id),
         FOREIGN KEY(createdBy) REFERENCES users(id)
       )
     `);
 
-    db.run(
-      'ALTER TABLE subcategories ADD COLUMN description TEXT',
-      (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-          console.error('Error adding description column:', err);
-        }
-      }
-    );
-
-    db.run(
-      'ALTER TABLE subcategories ADD COLUMN assignedToUserId INTEGER',
-      (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-          console.error('Error adding assignedToUserId column:', err);
-        }
-      }
-    );
-
-    db.run(
-      'ALTER TABLE users ADD COLUMN hasSeenTutorial INTEGER DEFAULT 0',
-      (err) => {
-        if (err && !err.message.includes('duplicate column name')) {
-          console.error('Error adding hasSeenTutorial column:', err);
-        }
-      }
-    );
-
     // Tasks/Calendar table
-    db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS tasks (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        title TEXT NOT NULL,
-        date TEXT NOT NULL,
+        id SERIAL PRIMARY KEY,
+        title VARCHAR(255) NOT NULL,
+        date DATE NOT NULL,
         subcategoryId INTEGER,
         createdBy INTEGER NOT NULL,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(subcategoryId) REFERENCES subcategories(id),
         FOREIGN KEY(createdBy) REFERENCES users(id)
       )
     `);
 
     // Email settings table
-    db.run(`
+    await pool.query(`
       CREATE TABLE IF NOT EXISTS email_settings (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id SERIAL PRIMARY KEY,
         userId INTEGER UNIQUE NOT NULL,
-        provider TEXT NOT NULL,
-        email TEXT NOT NULL,
+        provider VARCHAR(50) NOT NULL,
+        email VARCHAR(255) NOT NULL,
         appPassword TEXT NOT NULL,
-        lastSync DATETIME,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP,
+        lastSync TIMESTAMP,
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(userId) REFERENCES users(id)
       )
     `);
@@ -147,90 +128,45 @@ function initializeDatabase() {
     // Create default admin user
     const adminEmail = 'inaamimran07@gmail.com';
     const adminPassword = bcrypt.hashSync('Atg9341poL', 10);
-    db.run(
-      `INSERT OR IGNORE INTO users (email, password, name, isAdmin, approved, hasSeenTutorial) VALUES (?, ?, ?, ?, ?, ?)`,
-      [adminEmail, adminPassword, 'Admin', 1, 1, 1],
-      (err) => {
-        if (!err) {
-          console.log('Default admin user created');
-        }
-      }
+    await pool.query(
+      `INSERT INTO users (email, password, name, isAdmin, approved, hasSeenTutorial) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       ON CONFLICT (email) DO NOTHING`,
+      [adminEmail, adminPassword, 'Admin', true, true, true]
     );
+    console.log('Default admin user ensured');
 
-    // Create default categories (only if they don't exist)
-    db.get(
-      `SELECT id FROM categories WHERE name = 'Corporation Tax Returns'`,
-      (err, row) => {
-        if (!row) {
-          db.run(
-            `INSERT INTO categories (name, createdBy) 
-             SELECT ?, id FROM users WHERE email = ? AND isAdmin = 1 LIMIT 1`,
-            ['Corporation Tax Returns', adminEmail],
-            (err) => {
-              if (!err) {
-                console.log('Corporation Tax Returns category created');
-              }
-            }
-          );
-        }
-      }
+    // Create default categories
+    const adminUser = await pool.query(
+      'SELECT id FROM users WHERE email = $1 AND isAdmin = TRUE LIMIT 1',
+      [adminEmail]
     );
+    const adminId = adminUser.rows[0]?.id;
 
-    db.get(
-      `SELECT id FROM categories WHERE name = 'Self Assessments'`,
-      (err, row) => {
-        if (!row) {
-          db.run(
-            `INSERT INTO categories (name, createdBy) 
-             SELECT ?, id FROM users WHERE email = ? AND isAdmin = 1 LIMIT 1`,
-            ['Self Assessments', adminEmail],
-            (err) => {
-              if (!err) {
-                console.log('Self Assessments category created');
-              }
-            }
-          );
-        }
-      }
-    );
+    if (adminId) {
+      await pool.query(
+        `INSERT INTO categories (name, createdBy) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        ['Corporation Tax Returns', adminId]
+      );
+      await pool.query(
+        `INSERT INTO categories (name, createdBy) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        ['Self Assessments', adminId]
+      );
+      await pool.query(
+        `INSERT INTO categories (name, createdBy) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        ['Corporation Tax Return Emails', adminId]
+      );
+      await pool.query(
+        `INSERT INTO categories (name, createdBy) VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+        ['Self Assessment Emails', adminId]
+      );
+      console.log('Default categories ensured');
+    }
 
-    // Create email categories
-    db.get(
-      `SELECT id FROM categories WHERE name = 'Corporation Tax Return Emails'`,
-      (err, row) => {
-        if (!row) {
-          db.run(
-            `INSERT INTO categories (name, createdBy) 
-             SELECT ?, id FROM users WHERE email = ? AND isAdmin = 1 LIMIT 1`,
-            ['Corporation Tax Return Emails', adminEmail],
-            (err) => {
-              if (!err) {
-                console.log('Corporation Tax Return Emails category created');
-              }
-            }
-          );
-        }
-      }
-    );
-
-    db.get(
-      `SELECT id FROM categories WHERE name = 'Self Assessment Emails'`,
-      (err, row) => {
-        if (!row) {
-          db.run(
-            `INSERT INTO categories (name, createdBy) 
-             SELECT ?, id FROM users WHERE email = ? AND isAdmin = 1 LIMIT 1`,
-            ['Self Assessment Emails', adminEmail],
-            (err) => {
-              if (!err) {
-                console.log('Self Assessment Emails category created');
-              }
-            }
-          );
-        }
-      }
-    );
-  });
+    console.log('Database initialized successfully');
+  } catch (err) {
+    console.error('Error initializing database:', err);
+  }
 }
 
 // Auth middleware
@@ -254,28 +190,27 @@ function authenticateToken(req, res, next) {
 // Routes
 
 // Login
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', async (req, res) => {
   const { email, password } = req.body;
 
   if (!email || !password) {
     return res.status(400).json({ error: 'Email and password required' });
   }
 
-  db.get('SELECT * FROM users WHERE email = ?', [email], (err, user) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+  try {
+    const result = await pool.query('SELECT * FROM users WHERE email = $1', [email]);
+    const user = result.rows[0];
 
     if (!user || !bcrypt.compareSync(password, user.password)) {
       return res.status(401).json({ error: 'Invalid credentials' });
     }
 
-    if (!user.approved && !user.isAdmin) {
+    if (!user.approved && !user.isadmin) {
       return res.status(403).json({ error: 'Your account is pending admin approval' });
     }
 
     const token = jwt.encode(
-      { id: user.id, email: user.email, name: user.name, isAdmin: user.isAdmin },
+      { id: user.id, email: user.email, name: user.name, isAdmin: user.isadmin },
       SECRET_KEY
     );
 
@@ -285,15 +220,18 @@ app.post('/api/auth/login', (req, res) => {
         id: user.id,
         email: user.email,
         name: user.name,
-        isAdmin: user.isAdmin,
-        hasSeenTutorial: user.hasSeenTutorial
+        isAdmin: user.isadmin,
+        hasSeenTutorial: user.hasseentutorial
       }
     });
-  });
+  } catch (err) {
+    console.error('Login error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Register (requires admin approval)
-app.post('/api/auth/register', (req, res) => {
+app.post('/api/auth/register', async (req, res) => {
   const { email, password, name } = req.body;
 
   if (!email || !password || !name) {
@@ -302,24 +240,24 @@ app.post('/api/auth/register', (req, res) => {
 
   const hashedPassword = bcrypt.hashSync(password, 10);
 
-  db.run(
-    'INSERT INTO users (email, password, name, isAdmin, approved) VALUES (?, ?, ?, ?, ?)',
-    [email, hashedPassword, name, 0, 0],
-    function(err) {
-      if (err) {
-        return res.status(400).json({ error: 'Email already exists' });
-      }
+  try {
+    await pool.query(
+      'INSERT INTO users (email, password, name, isAdmin, approved) VALUES ($1, $2, $3, $4, $5)',
+      [email, hashedPassword, name, false, false]
+    );
 
-      res.status(201).json({
-        message: 'Account created! Waiting for admin approval.',
-        pending: true
-      });
-    }
-  );
+    res.status(201).json({
+      message: 'Account created! Waiting for admin approval.',
+      pending: true
+    });
+  } catch (err) {
+    console.error('Register error:', err);
+    return res.status(400).json({ error: 'Email already exists' });
+  }
 });
 
 // Admin creates user
-app.post('/api/users', authenticateToken, (req, res) => {
+app.post('/api/users', authenticateToken, async (req, res) => {
   const { email, password, name } = req.body;
 
   if (!req.user.isAdmin) {
@@ -332,135 +270,133 @@ app.post('/api/users', authenticateToken, (req, res) => {
 
   const hashedPassword = bcrypt.hashSync(password, 10);
 
-  db.run(
-    'INSERT INTO users (email, password, name, isAdmin) VALUES (?, ?, ?, ?)',
-    [email, hashedPassword, name, 0],
-    function(err) {
-      if (err) {
-        return res.status(400).json({ error: 'Email already exists' });
-      }
+  try {
+    const result = await pool.query(
+      'INSERT INTO users (email, password, name, isAdmin) VALUES ($1, $2, $3, $4) RETURNING id',
+      [email, hashedPassword, name, false]
+    );
 
-      res.status(201).json({
-        id: this.lastID,
-        email,
-        name,
-        isAdmin: 0
-      });
-    }
-  );
+    res.status(201).json({
+      id: result.rows[0].id,
+      email,
+      name,
+      isAdmin: false
+    });
+  } catch (err) {
+    console.error('Create user error:', err);
+    return res.status(400).json({ error: 'Email already exists' });
+  }
 });
 
 // Get all team members
-app.get('/api/team-members', authenticateToken, (req, res) => {
-  db.all(
-    `SELECT u.id, u.name, u.email, tm.color FROM users u 
-     LEFT JOIN team_members tm ON u.id = tm.userId 
-     WHERE tm.id IS NOT NULL`,
-    [],
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
-      }
-      res.json(rows);
-    }
-  );
+app.get('/api/team-members', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query(
+      `SELECT u.id, u.name, u.email, tm.color FROM users u 
+       LEFT JOIN team_members tm ON u.id = tm.userId 
+       WHERE tm.id IS NOT NULL`
+    );
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get team members error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Add team member (admin only)
-app.post('/api/team-members', authenticateToken, (req, res) => {
+app.post('/api/team-members', authenticateToken, async (req, res) => {
   const { userId, color } = req.body;
 
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  db.run(
-    'INSERT INTO team_members (userId, color, addedBy) VALUES (?, ?, ?)',
-    [userId, color, req.user.id],
-    (err) => {
-      if (err) {
-        return res.status(400).json({ error: 'Error adding team member' });
-      }
-      res.status(201).json({ id: this.lastID, userId, color });
-    }
-  );
+  try {
+    const result = await pool.query(
+      'INSERT INTO team_members (userId, color, addedBy) VALUES ($1, $2, $3) RETURNING id',
+      [userId, color, req.user.id]
+    );
+    res.status(201).json({ id: result.rows[0].id, userId, color });
+  } catch (err) {
+    console.error('Add team member error:', err);
+    return res.status(400).json({ error: 'Error adding team member' });
+  }
 });
 
 // Remove team member (admin only)
-app.delete('/api/team-members/:id', authenticateToken, (req, res) => {
+app.delete('/api/team-members/:id', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) {
     return res.status(403).json({ error: 'Admin access required' });
   }
 
-  db.run('DELETE FROM team_members WHERE id = ?', [req.params.id], (err) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
+  try {
+    await pool.query('DELETE FROM team_members WHERE id = $1', [req.params.id]);
     res.json({ success: true });
-  });
+  } catch (err) {
+    console.error('Remove team member error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Get all categories
-app.get('/api/categories', authenticateToken, (req, res) => {
-  db.all('SELECT * FROM categories ORDER BY createdAt DESC', [], (err, rows) => {
-    if (err) {
-      return res.status(500).json({ error: 'Database error' });
-    }
-    res.json(rows);
-  });
+app.get('/api/categories', authenticateToken, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM categories ORDER BY createdAt DESC');
+    res.json(result.rows);
+  } catch (err) {
+    console.error('Get categories error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Progress stats by category
-app.get('/api/stats/progress', authenticateToken, (req, res) => {
+app.get('/api/stats/progress', authenticateToken, async (req, res) => {
   const categoryNames = ['Corporation Tax Returns', 'Self Assessments'];
-  const placeholders = categoryNames.map(() => '?').join(', ');
 
-  db.all(
-    `
-      SELECT c.name AS category, s.progress, COUNT(s.id) AS count
-      FROM categories c
-      LEFT JOIN subcategories s ON s.categoryId = c.id
-      WHERE c.name IN (${placeholders})
-      GROUP BY c.name, s.progress
-    `,
-    categoryNames,
-    (err, rows) => {
-      if (err) {
-        return res.status(500).json({ error: 'Database error' });
+  try {
+    const result = await pool.query(
+      `SELECT c.name AS category, s.progress, COUNT(s.id) AS count
+       FROM categories c
+       LEFT JOIN subcategories s ON s.categoryId = c.id
+       WHERE c.name IN ($1, $2)
+       GROUP BY c.name, s.progress`,
+      categoryNames
+    );
+
+    const statsResult = {};
+    categoryNames.forEach((name) => {
+      statsResult[name] = {
+        completed: 0,
+        completedNotSubmitted: 0,
+        inProgress: 0,
+        notStarted: 0
+      };
+    });
+
+    result.rows.forEach((row) => {
+      const bucket = statsResult[row.category];
+      if (!bucket) return;
+
+      if (row.progress === 'completed') {
+        bucket.completed = parseInt(row.count);
+      } else if (row.progress === 'completed-not-submitted') {
+        bucket.completedNotSubmitted = parseInt(row.count);
+      } else if (row.progress === 'in-progress') {
+        bucket.inProgress = parseInt(row.count);
+      } else {
+        bucket.notStarted = parseInt(row.count);
       }
+    });
 
-      const result = {};
-      categoryNames.forEach((name) => {
-        result[name] = {
-          completed: 0,
-          completedNotSubmitted: 0,
-          inProgress: 0,
-          notStarted: 0
-        };
-      });
-
-      rows.forEach((row) => {
-        const bucket = result[row.category];
-        if (!bucket) return;
-
-        if (row.progress === 'completed') {
-          bucket.completed = row.count;
-        } else if (row.progress === 'completed-not-submitted') {
-          bucket.completedNotSubmitted = row.count;
-        } else if (row.progress === 'in-progress') {
-          bucket.inProgress = row.count;
-        } else {
-          bucket.notStarted = row.count;
-        }
-      });
-
-      res.json(result);
-    }
-  );
+    res.json(statsResult);
+  } catch (err) {
+    console.error('Get stats error:', err);
+    return res.status(500).json({ error: 'Database error' });
+  }
 });
 
 // Create category (admin only)
-app.post('/api/categories', authenticateToken, (req, res) => {
+app.post('/api/categories', authenticateToken, async (req, res) => {
   const { name } = req.body;
 
   if (!req.user.isAdmin) {

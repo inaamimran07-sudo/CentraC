@@ -17,6 +17,7 @@
     "jwt-simple": "^0.5.6",
     "mailparser": "^3.6.5",
     "nodemailer": "^7.0.13",
+    "pg": "^8.18.0",
     "sqlite3": "^5.1.6"
   },
   "devDependencies": {
