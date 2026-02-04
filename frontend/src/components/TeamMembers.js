@@ -150,28 +150,28 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
       <div className="section-header">
         <h2>Team Members</h2>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {isAdmin && pendingUsers.length > 0 && (
+          {isAdmin && (
             <div 
               onClick={() => setShowPendingBox(!showPendingBox)}
               style={{
-                backgroundColor: '#fff3cd',
-                border: '2px solid #ffc107',
+                backgroundColor: pendingUsers.length > 0 ? '#fff3cd' : '#e9ecef',
+                border: pendingUsers.length > 0 ? '2px solid #ffc107' : '2px solid #adb5bd',
                 borderRadius: '8px',
                 padding: '0.8rem 1rem',
                 cursor: 'pointer',
-                boxShadow: '0 2px 8px rgba(255,193,7,0.3)',
+                boxShadow: pendingUsers.length > 0 ? '0 2px 8px rgba(255,193,7,0.3)' : '0 2px 8px rgba(0,0,0,0.1)',
                 transition: 'all 0.2s ease'
               }}
               onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
               onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
-              <div style={{ fontWeight: 'bold', color: '#856404', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                ⏳ Users Waiting for Approval ({pendingUsers.length})
+              <div style={{ fontWeight: 'bold', color: pendingUsers.length > 0 ? '#856404' : '#6c757d', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                {pendingUsers.length > 0 ? `⏳ Users Waiting for Approval (${pendingUsers.length})` : '✓ No Pending Users'}
                 <span style={{ fontSize: '0.7rem' }}>{showPendingBox ? '▼' : '▶'}</span>
               </div>
               {showPendingBox && (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
-                  {pendingUsers.map(user => (
+                  {pendingUsers.length > 0 ? pendingUsers.map(user => (
                     <div key={user.id} style={{
                       display: 'flex',
                       alignItems: 'center',
@@ -222,7 +222,17 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
                         ✗ Reject
                       </button>
                     </div>
-                  ))}
+                  )) : (
+                    <div style={{ 
+                      padding: '0.5rem', 
+                      textAlign: 'center', 
+                      color: '#6c757d',
+                      fontSize: '0.85rem',
+                      fontStyle: 'italic'
+                    }}>
+                      No users pending approval
+                    </div>
+                  )}
                 </div>
               )}
             </div>
