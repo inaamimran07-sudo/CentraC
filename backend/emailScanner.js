@@ -112,36 +112,24 @@ class EmailScanner {
         return;
       }
 
-      // Parse the full email including headers
-      const mail = await simpleParser(all.body);
+      // Parse header and body separately for better extraction
+      const headerParsed = await simpleParser(idHeader.body);
+      const bodyParsed = await simpleParser(all.body);
       
-      // Try to get subject from parsed email first, then from header attributes
-      let subject = mail.subject;
-      
-      // If no subject from parsed email, try to extract from header
-      if (!subject && idHeader.body) {
-        const headerMail = await simpleParser(idHeader.body);
-        subject = headerMail.subject;
-      }
-      
-      // Fallback to checking header attributes
-      if (!subject && item.attributes && item.attributes.envelope) {
-        subject = item.attributes.envelope.subject;
-      }
-      
-      subject = subject || 'No Subject';
-      const from = mail.from?.text || 'Unknown Sender';
-      const fromEmail = mail.from?.value?.[0]?.address || 'No email';
-      const date = mail.date || new Date();
+      // Get subject from header
+      const subject = headerParsed.subject || bodyParsed.subject || 'No Subject';
+      const from = headerParsed.from?.text || bodyParsed.from?.text || 'Unknown Sender';
+      const fromEmail = headerParsed.from?.value?.[0]?.address || bodyParsed.from?.value?.[0]?.address || 'No email';
+      const date = headerParsed.date || bodyParsed.date || new Date();
       
       // Log email details for debugging
       console.log(`📧 Email found: Subject="${subject}", From=${from}, Date=${date.toLocaleDateString()}`);
       
       // Get email body text
-      const emailText = mail.text || mail.html || 'No content';
+      const emailText = bodyParsed.text || bodyParsed.html || 'No content';
       
       // Get attachments info
-      const attachments = mail.attachments || [];
+      const attachments = bodyParsed.attachments || [];
       const attachmentsList = attachments.map(att => `📎 ${att.filename} (${this.formatBytes(att.size)})`).join('\n');
 
       // Check for keywords - prioritize specific matches
