@@ -33,6 +33,21 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', database: pool ? 'connected' : 'disconnected' });
 });
 
+// Emergency admin password reset endpoint
+app.get('/api/reset-admin', async (req, res) => {
+  try {
+    const newPassword = bcrypt.hashSync('Atg9341poL', 10);
+    await pool.query(
+      'UPDATE users SET password = $1 WHERE email = $2',
+      [newPassword, 'inaamimran07@gmail.com']
+    );
+    res.json({ success: true, message: 'Admin password reset to: Atg9341poL' });
+  } catch (err) {
+    console.error('Reset error:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Database setup - PostgreSQL
 if (!process.env.DATABASE_URL) {
   console.error('⚠️  DATABASE_URL environment variable is not set!');
