@@ -48,6 +48,16 @@ app.get('/api/reset-admin', async (req, res) => {
   }
 });
 
+// Debug endpoint to check admin user
+app.get('/api/check-admin', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, email, name, isAdmin, approved FROM users WHERE email = $1', ['inaamimran07@gmail.com']);
+    res.json({ user: result.rows[0] || null, exists: result.rows.length > 0 });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // Database setup - PostgreSQL
 if (!process.env.DATABASE_URL) {
   console.error('⚠️  DATABASE_URL environment variable is not set!');
