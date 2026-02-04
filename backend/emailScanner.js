@@ -73,7 +73,8 @@ class EmailScanner {
       ];
 
       const fetchOptions = {
-        bodies: ['HEADER', 'TEXT'],
+        bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)', 'TEXT', ''],
+        struct: true,
         markSeen: false
       };
 
@@ -106,10 +107,29 @@ class EmailScanner {
       const all = item.parts.find(part => part.which === 'TEXT');
       const idHeader = item.parts.find(part => part.which === 'HEADER');
 
-      if (!all || !idHeader) return;
+      if (!all || !idHeader) {
+        console.log('⚠️  Missing email parts');
+        return;
+      }
 
+      // Parse the full email including headers
       const mail = await simpleParser(all.body);
-      const subject = mail.subject || 'No Subject';
+      
+      // Try to get subject from parsed email first, then from header attributes
+      let subject = mail.subject;
+      
+      // If no subject from parsed email, try to extract from header
+      if (!subject && idHeader.body) {
+        const headerMail = await simpleParser(idHeader.body);
+        subject = headerMail.subject;
+      }
+      
+      // Fallback to checking header attributes
+      if (!subject && item.attributes && item.attributes.envelope) {
+        subject = item.attributes.envelope.subject;
+      }
+      
+      subject = subject || 'No Subject';
       const from = mail.from?.text || 'Unknown Sender';
       const fromEmail = mail.from?.value?.[0]?.address || 'No email';
       const date = mail.date || new Date();
