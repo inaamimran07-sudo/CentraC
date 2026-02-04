@@ -200,23 +200,37 @@ class EmailScanner {
               description += `\n${'-'.repeat(50)}\n\n`;
               description += `[Auto-created from email scan]`;
 
-              // Calculate due date based on category type
+              // Calculate due date based on UK accountancy deadlines
               const dueDate = new Date();
               if (yearEndDate) {
                 dueDate.setTime(yearEndDate.getTime());
                 if (matchedCategoryName === 'Corporation Tax Returns') {
-                  // CT600: 12 months after accounting period end (filing deadline)
+                  // UK CT600 filing deadline: 12 months after accounting period end
                   dueDate.setMonth(dueDate.getMonth() + 12);
                 } else {
-                  // Self Assessment: January 31st following the tax year
-                  // Tax year ends April 5th, so deadline is next January 31st
-                  const taxYearEnd = new Date(yearEndDate);
-                  dueDate.setFullYear(taxYearEnd.getFullYear() + (taxYearEnd.getMonth() >= 3 ? 1 : 0));
+                  // UK Self Assessment: January 31st following the tax year end
+                  // Tax year ends April 5th, deadline is January 31st of the next year
+                  // If date is between April 6 and Dec 31, deadline is Jan 31 next year
+                  // If date is between Jan 1 and April 5, deadline is Jan 31 same year (already passed for current year, so next)
+                  const yearEndMonth = yearEndDate.getMonth();
+                  const yearEndDay = yearEndDate.getDate();
+                  
+                  // Tax year runs April 6 to April 5
+                  // If we're on or before April 5, deadline is Jan 31 of the following year
+                  // If we're after April 5, deadline is Jan 31 of the year after next
+                  if (yearEndMonth < 3 || (yearEndMonth === 3 && yearEndDay <= 5)) {
+                    // Before or on April 5: deadline is Jan 31 next year
+                    dueDate.setFullYear(yearEndDate.getFullYear() + 1);
+                  } else {
+                    // After April 5: deadline is Jan 31 of year after next
+                    dueDate.setFullYear(yearEndDate.getFullYear() + 2);
+                  }
                   dueDate.setMonth(0); // January
                   dueDate.setDate(31); // 31st
                 }
               } else {
-                dueDate.setMonth(dueDate.getMonth() + 6); // Default 6 months from now
+                // Default: 6 months from now if no year end found
+                dueDate.setMonth(dueDate.getMonth() + 6);
               }
 
               this.db.run(
