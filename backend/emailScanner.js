@@ -73,7 +73,7 @@ class EmailScanner {
       ];
 
       const fetchOptions = {
-        bodies: ['HEADER.FIELDS (FROM TO SUBJECT DATE)', 'TEXT', ''],
+        bodies: ['HEADER', 'TEXT', ''],
         struct: true,
         markSeen: false
       };
