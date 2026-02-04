@@ -62,8 +62,8 @@ async function initializeDatabase() {
         color VARCHAR(50) NOT NULL,
         addedBy INTEGER NOT NULL,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(userId) REFERENCES users(id),
-        FOREIGN KEY(addedBy) REFERENCES users(id)
+        FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE,
+        FOREIGN KEY(addedBy) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
@@ -74,7 +74,7 @@ async function initializeDatabase() {
         name VARCHAR(255) NOT NULL,
         createdBy INTEGER NOT NULL,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(createdBy) REFERENCES users(id)
+        FOREIGN KEY(createdBy) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
@@ -91,9 +91,9 @@ async function initializeDatabase() {
         dueDate DATE NOT NULL,
         createdBy INTEGER NOT NULL,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(categoryId) REFERENCES categories(id),
-        FOREIGN KEY(assignedToUserId) REFERENCES users(id),
-        FOREIGN KEY(createdBy) REFERENCES users(id)
+        FOREIGN KEY(categoryId) REFERENCES categories(id) ON DELETE CASCADE,
+        FOREIGN KEY(assignedToUserId) REFERENCES users(id) ON DELETE SET NULL,
+        FOREIGN KEY(createdBy) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
@@ -106,8 +106,8 @@ async function initializeDatabase() {
         subcategoryId INTEGER,
         createdBy INTEGER NOT NULL,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(subcategoryId) REFERENCES subcategories(id),
-        FOREIGN KEY(createdBy) REFERENCES users(id)
+        FOREIGN KEY(subcategoryId) REFERENCES subcategories(id) ON DELETE CASCADE,
+        FOREIGN KEY(createdBy) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
@@ -122,7 +122,7 @@ async function initializeDatabase() {
         lastSync TIMESTAMP,
         createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         UNIQUE(userId),
-        FOREIGN KEY(userId) REFERENCES users(id)
+        FOREIGN KEY(userId) REFERENCES users(id) ON DELETE CASCADE
       )
     `);
 
