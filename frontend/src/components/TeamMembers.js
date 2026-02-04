@@ -149,25 +149,77 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
     >
       <div className="section-header">
         <h2>Team Members</h2>
-        {isAdmin && (
-          <div style={{ display: 'flex', gap: '0.5rem' }}>
-            {pendingUsers.length > 0 && (
-              <button 
-                onClick={() => setShowPendingModal(true)} 
-                className="add-btn"
-                style={{ backgroundColor: '#ff9800' }}
-              >
-                ⏳ Pending ({pendingUsers.length})
-              </button>
-            )}
+        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+          {isAdmin && pendingUsers.length > 0 && (
+            <div style={{
+              backgroundColor: '#fff3cd',
+              border: '2px solid #ffc107',
+              borderRadius: '8px',
+              padding: '0.8rem 1rem',
+              boxShadow: '0 2px 8px rgba(255,193,7,0.3)'
+            }}>
+              <div style={{ fontWeight: 'bold', color: '#856404', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+                ⏳ Users Waiting for Approval ({pendingUsers.length})
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                {pendingUsers.map(user => (
+                  <div key={user.id} style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '0.5rem',
+                    backgroundColor: 'white',
+                    padding: '0.5rem',
+                    borderRadius: '4px',
+                    fontSize: '0.85rem'
+                  }}>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: '500', color: '#333' }}>{user.name}</div>
+                      <div style={{ fontSize: '0.75rem', color: '#666' }}>{user.email}</div>
+                    </div>
+                    <button
+                      onClick={() => handleApproveUser(user.id)}
+                      style={{
+                        backgroundColor: '#28a745',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.3rem 0.6rem',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}
+                    >
+                      ✓ Approve
+                    </button>
+                    <button
+                      onClick={() => handleRejectUser(user.id)}
+                      style={{
+                        backgroundColor: '#dc3545',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '4px',
+                        padding: '0.3rem 0.6rem',
+                        cursor: 'pointer',
+                        fontSize: '0.75rem',
+                        fontWeight: '600'
+                      }}
+                    >
+                      ✗ Reject
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          {isAdmin && (
             <button onClick={() => {
               fetchAvailableUsers();
               setShowModal(true);
             }} className="add-btn">
               + Add to Team
             </button>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       <div className="team-members-list">
