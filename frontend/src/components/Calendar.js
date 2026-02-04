@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_URL from '../config';
 import '../styles/Calendar.css';
 
 function Calendar({ token, userId }) {
@@ -21,7 +22,7 @@ function Calendar({ token, userId }) {
 
   const fetchTasksForMonth = async () => {
     try {
-      const response = await axios.get('/api/tasks', {
+      const response = await axios.get(API_URL + '/api/tasks', {
         headers: { Authorization: `Bearer ${token}` }
       });
       const tasksByDate = {};
@@ -60,7 +61,7 @@ function Calendar({ token, userId }) {
 
     try {
       await axios.post(
-        '/api/tasks',
+        API_URL + '/api/tasks',
         { title: taskTitle, date: selectedDate },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -79,7 +80,7 @@ function Calendar({ token, userId }) {
     const secondConfirm = window.confirm('Are you absolutely sure you want to delete this task?');
     if (!secondConfirm) return;
     try {
-      await axios.delete(`/api/tasks/${taskId}`, {
+      await axios.delete(API_URL + `/api/tasks/${taskId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchTasksForMonth();

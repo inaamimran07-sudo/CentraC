@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
+import API_URL from '../config';
 import '../styles/TeamMembers.css';
 
 function TeamMembers({ isAdmin, token, onRefresh }) {
@@ -26,7 +27,7 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
 
   const fetchTeamMembers = async () => {
     try {
-      const response = await axios.get('/api/team-members', {
+      const response = await axios.get(API_URL + '/api/team-members', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setTeamMembers(response.data);
@@ -40,7 +41,7 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
   const fetchAvailableUsers = async () => {
     if (!isAdmin) return;
     try {
-      const response = await axios.get('/api/users', {
+      const response = await axios.get(API_URL + '/api/users', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAvailableUsers(response.data);
@@ -58,7 +59,7 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
 
     try {
       await axios.post(
-        '/api/team-members',
+        API_URL + '/api/team-members',
         { userId: parseInt(selectedUserId), color: selectedColor },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -79,7 +80,7 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
     const secondConfirm = window.confirm('Are you absolutely sure you want to remove this team member?');
     if (!secondConfirm) return;
     try {
-      await axios.delete(`/api/team-members/${id}`, {
+      await axios.delete(API_URL + `/api/team-members/${id}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchTeamMembers();
@@ -92,7 +93,7 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
   const fetchPendingUsers = async () => {
     if (!isAdmin) return;
     try {
-      const response = await axios.get('/api/users/pending', {
+      const response = await axios.get(API_URL + '/api/users/pending', {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPendingUsers(response.data);
@@ -104,7 +105,7 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
   const handleApproveUser = async (userId) => {
     try {
       await axios.post(
-        `/api/users/${userId}/approve`,
+        API_URL + `/api/users/${userId}/approve`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -123,7 +124,7 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
     const secondConfirm = window.confirm('Are you absolutely sure you want to reject and delete this user?');
     if (!secondConfirm) return;
     try {
-      await axios.delete(`/api/users/${userId}`, {
+      await axios.delete(API_URL + `/api/users/${userId}`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       fetchPendingUsers();

@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
+import API_URL from '../config';
 import '../styles/WelcomeTutorial.css';
 
 function WelcomeTutorial({ user, token, onComplete }) {
@@ -67,7 +68,7 @@ function WelcomeTutorial({ user, token, onComplete }) {
 
   const handleComplete = async () => {
     try {
-      await axios.post('/api/users/tutorial-seen', {}, {
+      await axios.post(API_URL + '/api/users/tutorial-seen', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });
       onComplete();
