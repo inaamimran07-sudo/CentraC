@@ -112,24 +112,22 @@ class EmailScanner {
         return;
       }
 
-      // Parse header and body separately for better extraction
-      const headerParsed = await simpleParser(idHeader.body);
-      const bodyParsed = await simpleParser(all.body);
+      // Parse the complete email
+      const mail = await simpleParser(all.body);
       
-      // Get subject from header
-      const subject = headerParsed.subject || bodyParsed.subject || 'No Subject';
-      const from = headerParsed.from?.text || bodyParsed.from?.text || 'Unknown Sender';
-      const fromEmail = headerParsed.from?.value?.[0]?.address || bodyParsed.from?.value?.[0]?.address || 'No email';
-      const date = headerParsed.date || bodyParsed.date || new Date();
+      const subject = mail.subject || 'No Subject';
+      const from = mail.from?.text || 'Unknown Sender';
+      const fromEmail = mail.from?.value?.[0]?.address || 'No email';
+      const date = mail.date || new Date();
       
       // Log email details for debugging
       console.log(`📧 Email found: Subject="${subject}", From=${from}, Date=${date.toLocaleDateString()}`);
       
       // Get email body text
-      const emailText = bodyParsed.text || bodyParsed.html || 'No content';
+      const emailText = mail.text || mail.html || 'No content';
       
       // Get attachments info
-      const attachments = bodyParsed.attachments || [];
+      const attachments = mail.attachments || [];
       const attachmentsList = attachments.map(att => `📎 ${att.filename} (${this.formatBytes(att.size)})`).join('\n');
 
       // Check for keywords - prioritize specific matches
