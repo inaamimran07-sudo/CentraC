@@ -75,6 +75,12 @@ function EmailSettings() {
     setMessage('');
     
     try {
+      // First create email categories if they don't exist
+      await axios.post('/api/create-email-categories', {}, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      // Then scan emails
       await axios.post('/api/scan-emails', {}, {
         headers: { Authorization: `Bearer ${token}` }
       });

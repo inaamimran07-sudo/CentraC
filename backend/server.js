@@ -860,6 +860,34 @@ app.delete('/api/email-settings', authenticateToken, (req, res) => {
 // Initialize email scanner
 const emailScanner = new EmailScanner('./app.db');
 
+// Manual endpoint to create email categories
+app.post('/api/create-email-categories', authenticateToken, (req, res) => {
+  if (!req.user.isAdmin) {
+    return res.status(403).json({ error: 'Admin access required' });
+  }
+
+  db.get('SELECT id FROM categories WHERE name = ?', ['Corporation Tax Return Emails'], (err, row) => {
+    if (!row) {
+      db.run('INSERT INTO categories (name, createdBy) VALUES (?, ?)', 
+        ['Corporation Tax Return Emails', req.user.id], (err) => {
+          if (err) console.error('Error creating Corp Tax category:', err);
+        });
+    }
+  });
+
+  db.get('SELECT id FROM categories WHERE name = ?', ['Self Assessment Emails'], (err, row) => {
+    if (!row) {
+      db.run('INSERT INTO categories (name, createdBy) VALUES (?, ?)', 
+        ['Self Assessment Emails', req.user.id], (err) => {
+          if (err) console.error('Error creating Self Assessment category:', err);
+          else res.json({ success: true, message: 'Email categories created' });
+        });
+    } else {
+      res.json({ success: true, message: 'Categories already exist' });
+    }
+  });
+});
+
 // Manual scan trigger endpoint
 app.post('/api/scan-emails', authenticateToken, async (req, res) => {
   if (!req.user.isAdmin) {
