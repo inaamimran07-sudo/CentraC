@@ -13,24 +13,54 @@ const SECRET_KEY = process.env.SECRET_KEY || 'your-secret-key-change-in-producti
 const PORT = process.env.PORT || 5000;
 
 // Middleware
+const allowedOrigins = [
+  'https://centrac-frontend.onrender.com',
+  'http://localhost:3000',
+  process.env.FRONTEND_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || '*',
-  credentials: true
+  origin: function(origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
+
 app.use(bodyParser.json());
 
+// Health check endpoint
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', database: pool ? 'connected' : 'disconnected' });
+});
+
 // Database setup - PostgreSQL
+if (!process.env.DATABASE_URL) {
+  console.error('⚠️  DATABASE_URL environment variable is not set!');
+  process.exit(1);
+}
+
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
-  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false
+  ssl: process.env.DATABASE_URL ? { rejectUnauthorized: false } : false,
+  max: 20,
+  idleTimeoutMillis: 30000,
+  connectionTimeoutMillis: 10000,
 });
 
 pool.on('connect', () => {
-  console.log('Connected to PostgreSQL database');
+  console.log('✅ Connected to PostgreSQL database');
 });
 
 pool.on('error', (err) => {
-  console.error('Unexpected error on idle client', err);
+  console.error('❌ Unexpected error on idle client', err);
   process.exit(-1);
 });
 
@@ -766,8 +796,16 @@ app.post('/api/email-settings', authenticateToken, async (req, res) => {
     res.json({ success: true });
   } catch (err) {
     console.error('Save email settings error:', err);
-    console.error('Error details:', err.message, err.code);
-    return res.status(500).json({ error: 'Database error: ' + err.message });
+    console.error('Error details:', {
+      message: err.message,
+      code: err.code,
+      detail: err.detail,
+      stack: err.stack
+    });
+    return res.status(500).json({ 
+      error: 'Database error: ' + err.message,
+      details: process.env.NODE_ENV === 'production' ? undefined : err.detail
+    });
   }
 });
 
@@ -853,7 +891,10 @@ setTimeout(async () => {
 }, 10000);
 
 app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🚀 Server running on port ${PORT}`);
+  console.log(`📍 Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`🌐 CORS allowed origins:`, allowedOrigins);
+  console.log(`🗄️  Database: ${process.env.DATABASE_URL ? 'Connected' : 'Not configured'}`);
   console.log(`📧 Email scanner active - checking every ${SCAN_INTERVAL / 60000} minutes`);
+  console.log(`✅ Server ready to accept connections`);
 });
