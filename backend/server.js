@@ -5,6 +5,7 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const path = require('path');
+const EmailScanner = require('./emailScanner');
 require('dotenv').config();
 
 const app = express();
@@ -819,7 +820,31 @@ app.delete('/api/email-settings', authenticateToken, (req, res) => {
   );
 });
 
+// Initialize email scanner
+const emailScanner = new EmailScanner('./app.db');
+
+// Scan emails every 5 minutes
+const SCAN_INTERVAL = 5 * 60 * 1000; // 5 minutes
+setInterval(async () => {
+  try {
+    await emailScanner.scanAllUsers();
+  } catch (error) {
+    console.error('Email scan error:', error);
+  }
+}, SCAN_INTERVAL);
+
+// Initial scan on startup (after 10 seconds to let server start)
+setTimeout(async () => {
+  console.log('🚀 Starting initial email scan...');
+  try {
+    await emailScanner.scanAllUsers();
+  } catch (error) {
+    console.error('Initial email scan error:', error);
+  }
+}, 10000);
+
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`);
   console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+  console.log(`📧 Email scanner active - checking every ${SCAN_INTERVAL / 60000} minutes`);
 });
