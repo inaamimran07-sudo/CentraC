@@ -174,11 +174,18 @@ class EmailScanner {
                 return;
               }
 
+              // Try to extract company year end date from email content
+              const yearEndDate = this.extractYearEndDate(emailText);
+              
               // Build detailed description
               let description = `📧 EMAIL FROM: ${from}\n`;
               description += `📨 EMAIL ADDRESS: ${fromEmail}\n`;
               description += `📅 DATE: ${date.toLocaleDateString()} ${date.toLocaleTimeString()}\n`;
-              description += `🏷️  CATEGORY: ${matchedCategoryName}\n\n`;
+              description += `🏷️  CATEGORY: ${matchedCategoryName}\n`;
+              if (yearEndDate) {
+                description += `📆 COMPANY YEAR END: ${yearEndDate.toLocaleDateString()}\n`;
+              }
+              description += `\n`;
               
               if (attachments.length > 0) {
                 description += `📎 ATTACHMENTS (${attachments.length}):\n${attachmentsList}\n\n`;
@@ -193,9 +200,14 @@ class EmailScanner {
               description += `\n${'-'.repeat(50)}\n\n`;
               description += `[Auto-created from email scan]`;
 
-              // Create new subcategory from email
+              // Calculate due date: 9 months after year end, or 6 months from now if year end not found
               const dueDate = new Date();
-              dueDate.setMonth(dueDate.getMonth() + 6); // Default 6 months from now
+              if (yearEndDate) {
+                dueDate.setTime(yearEndDate.getTime());
+                dueDate.setMonth(dueDate.getMonth() + 9); // 9 months after year end
+              } else {
+                dueDate.setMonth(dueDate.getMonth() + 6); // Default 6 months from now
+              }
 
               this.db.run(
                 `INSERT INTO subcategories 
@@ -226,6 +238,43 @@ class EmailScanner {
     } catch (error) {
       console.error('Error processing email:', error);
     }
+  }
+
+  extractYearEndDate(emailText) {
+    // Common patterns for year end dates
+    const patterns = [
+      /year\s*end[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      /year\s*ending[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      /accounting\s*period\s*end[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      /financial\s*year\s*end[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      /period\s*end[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      /y\/e[:\s]+(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})/i,
+      /(\d{1,2}[\/\-]\d{1,2}[\/\-]\d{2,4})\s*year\s*end/i,
+      // Date format: 31 March 2024, 31st March 2024, etc.
+      /year\s*end[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})/i,
+      /year\s*ending[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})/i,
+      /accounting\s*period\s*end[:\s]+(\d{1,2}(?:st|nd|rd|th)?\s+(?:Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4})/i,
+    ];
+
+    for (const pattern of patterns) {
+      const match = emailText.match(pattern);
+      if (match) {
+        const dateStr = match[1];
+        try {
+          // Try parsing the date
+          const parsedDate = new Date(dateStr);
+          if (!isNaN(parsedDate.getTime())) {
+            console.log(`📆 Found year end date: ${parsedDate.toLocaleDateString()}`);
+            return parsedDate;
+          }
+        } catch (e) {
+          // Continue to next pattern
+        }
+      }
+    }
+
+    console.log('⚠️  No year end date found in email content');
+    return null;
   }
 
   formatBytes(bytes, decimals = 2) {
