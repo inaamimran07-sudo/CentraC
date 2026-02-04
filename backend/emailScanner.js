@@ -114,6 +114,9 @@ class EmailScanner {
       const fromEmail = mail.from?.value?.[0]?.address || 'No email';
       const date = mail.date || new Date();
       
+      // Log email details for debugging
+      console.log(`📧 Email found: Subject="${subject}", From=${from}, Date=${date.toLocaleDateString()}`);
+      
       // Get email body text
       const emailText = mail.text || mail.html || 'No content';
       
