@@ -104,27 +104,59 @@ class EmailScanner {
 
   async processEmail(item, userId) {
     try {
-      const all = item.parts.find(part => part.which === 'TEXT');
-      const idHeader = item.parts.find(part => part.which === 'HEADER');
+      const all = item.parts.find(part => part.which === '');
+      const headerPart = item.parts.find(part => part.which === 'HEADER');
 
-      if (!all || !idHeader) {
-        console.log('⚠️  Missing email parts');
+      if (!all) {
+        console.log('⚠️  Missing email body');
         return;
       }
 
-      // Parse the complete email
+      // Parse the complete email with full message
       const mail = await simpleParser(all.body);
       
-      const subject = mail.subject || 'No Subject';
-      const from = mail.from?.text || 'Unknown Sender';
-      const fromEmail = mail.from?.value?.[0]?.address || 'No email';
+      const subject = mail.subject || mail.headers.get('subject') || 'No Subject';
+      
+      // Extract sender info more reliably
+      let from = 'Unknown Sender';
+      let fromEmail = 'No email';
+      
+      if (mail.from && mail.from.value && mail.from.value.length > 0) {
+        const sender = mail.from.value[0];
+        from = sender.name || sender.address || 'Unknown Sender';
+        fromEmail = sender.address || 'No email';
+      } else if (mail.headers.has('from')) {
+        const fromHeader = mail.headers.get('from');
+        from = fromHeader;
+        // Extract email from "Name <email@domain.com>" format
+        const emailMatch = fromHeader.match(/<([^>]+)>/);
+        fromEmail = emailMatch ? emailMatch[1] : fromHeader;
+      }
+      
       const date = mail.date || new Date();
       
       // Log email details for debugging
-      console.log(`📧 Email found: Subject="${subject}", From=${from}, Date=${date.toLocaleDateString()}`);
+      console.log(`📧 Email found: Subject="${subject}", From=${from} (${fromEmail}), Date=${date.toLocaleDateString()}`);
       
-      // Get email body text
-      const emailText = mail.text || mail.html || 'No content';
+      // Get email body text - prefer text over HTML
+      let emailText = '';
+      if (mail.text) {
+        // Clean up text by removing excessive whitespace and boundary markers
+        emailText = mail.text
+          .replace(/--[0-9a-f]+/g, '') // Remove boundary markers
+          .replace(/Content-Type:.*$/gm, '') // Remove content-type lines
+          .replace(/charset=.*$/gm, '') // Remove charset lines
+          .replace(/\n{3,}/g, '\n\n') // Replace multiple newlines with double newline
+          .trim();
+      } else if (mail.html) {
+        // Strip HTML tags for cleaner text
+        emailText = mail.html
+          .replace(/<[^>]*>/g, ' ')
+          .replace(/\s+/g, ' ')
+          .trim();
+      } else {
+        emailText = 'No content';
+      }
       
       // Get attachments info
       const attachments = mail.attachments || [];
