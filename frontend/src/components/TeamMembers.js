@@ -9,6 +9,7 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
   const [showPendingModal, setShowPendingModal] = useState(false);
+  const [showPendingBox, setShowPendingBox] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState('');
   const [selectedColor, setSelectedColor] = useState('#FF6B6B');
 
@@ -150,64 +151,80 @@ function TeamMembers({ isAdmin, token, onRefresh }) {
         <h2>Team Members</h2>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           {isAdmin && pendingUsers.length > 0 && (
-            <div style={{
-              backgroundColor: '#fff3cd',
-              border: '2px solid #ffc107',
-              borderRadius: '8px',
-              padding: '0.8rem 1rem',
-              boxShadow: '0 2px 8px rgba(255,193,7,0.3)'
-            }}>
-              <div style={{ fontWeight: 'bold', color: '#856404', marginBottom: '0.5rem', fontSize: '0.9rem' }}>
+            <div 
+              onClick={() => setShowPendingBox(!showPendingBox)}
+              style={{
+                backgroundColor: '#fff3cd',
+                border: '2px solid #ffc107',
+                borderRadius: '8px',
+                padding: '0.8rem 1rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 8px rgba(255,193,7,0.3)',
+                transition: 'all 0.2s ease'
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.02)'}
+              onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
+            >
+              <div style={{ fontWeight: 'bold', color: '#856404', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 ⏳ Users Waiting for Approval ({pendingUsers.length})
+                <span style={{ fontSize: '0.7rem' }}>{showPendingBox ? '▼' : '▶'}</span>
               </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
-                {pendingUsers.map(user => (
-                  <div key={user.id} style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: '0.5rem',
-                    backgroundColor: 'white',
-                    padding: '0.5rem',
-                    borderRadius: '4px',
-                    fontSize: '0.85rem'
-                  }}>
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontWeight: '500', color: '#333' }}>{user.name}</div>
-                      <div style={{ fontSize: '0.75rem', color: '#666' }}>{user.email}</div>
+              {showPendingBox && (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', marginTop: '0.5rem' }}>
+                  {pendingUsers.map(user => (
+                    <div key={user.id} style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '0.5rem',
+                      backgroundColor: 'white',
+                      padding: '0.5rem',
+                      borderRadius: '4px',
+                      fontSize: '0.85rem'
+                    }}>
+                      <div style={{ flex: 1 }}>
+                        <div style={{ fontWeight: '500', color: '#333' }}>{user.name}</div>
+                        <div style={{ fontSize: '0.75rem', color: '#666' }}>{user.email}</div>
+                      </div>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleApproveUser(user.id);
+                        }}
+                        style={{
+                          backgroundColor: '#28a745',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.3rem 0.6rem',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        ✓ Approve
+                      </button>
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleRejectUser(user.id);
+                        }}
+                        style={{
+                          backgroundColor: '#dc3545',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '4px',
+                          padding: '0.3rem 0.6rem',
+                          cursor: 'pointer',
+                          fontSize: '0.75rem',
+                          fontWeight: '600'
+                        }}
+                      >
+                        ✗ Reject
+                      </button>
                     </div>
-                    <button
-                      onClick={() => handleApproveUser(user.id)}
-                      style={{
-                        backgroundColor: '#28a745',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '0.3rem 0.6rem',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: '600'
-                      }}
-                    >
-                      ✓ Approve
-                    </button>
-                    <button
-                      onClick={() => handleRejectUser(user.id)}
-                      style={{
-                        backgroundColor: '#dc3545',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '4px',
-                        padding: '0.3rem 0.6rem',
-                        cursor: 'pointer',
-                        fontSize: '0.75rem',
-                        fontWeight: '600'
-                      }}
-                    >
-                      ✗ Reject
-                    </button>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
           {isAdmin && (
