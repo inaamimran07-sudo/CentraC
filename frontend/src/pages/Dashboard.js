@@ -3,6 +3,7 @@ import axios from '../axiosConfig';
 import { AuthContext } from '../context/AuthContext';
 import TeamMembers from '../components/TeamMembers';
 import Categories from '../components/Categories';
+import Emails from '../components/Emails';
 import Calendar from '../components/Calendar';
 import WelcomeTutorial from '../components/WelcomeTutorial';
 import '../styles/Dashboard.css';
@@ -131,6 +132,12 @@ function Dashboard() {
                 📁 Categories
               </button>
               <button 
+                className={`nav-item ${activeTab === 'emails' ? 'active' : ''}`}
+                onClick={() => setActiveTab('emails')}
+              >
+                📧 Emails
+              </button>
+              <button 
                 className={`nav-item ${activeTab === 'calendar' ? 'active' : ''}`}
                 onClick={() => setActiveTab('calendar')}
               >
@@ -146,6 +153,9 @@ function Dashboard() {
           )}
           {activeTab === 'categories' && (
             <Categories key={refreshKey} onRefresh={handleRefresh} isAdmin={user.isAdmin} token={token} userId={user.id} />
+          )}
+          {activeTab === 'emails' && (
+            <Emails key={refreshKey} onRefresh={handleRefresh} isAdmin={user.isAdmin} token={token} userId={user.id} />
           )}
           {activeTab === 'calendar' && (
             <Calendar key={refreshKey} token={token} userId={user.id} />
